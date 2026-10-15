@@ -1,0 +1,33 @@
+# CHIP_QUERY_V1
+t wordnet_s16_medium_01 16 15
+v 0 L1
+v 1 L1
+v 2 L1
+v 3 L1
+v 4 L1
+v 5 L1
+v 6 L1
+v 7 L1
+v 8 L1
+v 9 L2
+v 10 L1
+v 11 L1
+v 12 L1
+v 13 L1
+v 14 L1
+v 15 L1
+e 0 1
+e 0 11
+e 1 2
+e 1 10
+e 1 12
+e 2 3
+e 2 4
+e 2 5
+e 5 6
+e 6 7
+e 7 8
+e 8 9
+e 12 13
+e 13 14
+e 14 15

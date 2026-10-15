@@ -1,0 +1,21 @@
+# CHIP_QUERY_V1
+t dblp_s8_medium_06 8 11
+v 0 L9
+v 1 L9
+v 2 L9
+v 3 L11
+v 4 L13
+v 5 L7
+v 6 L5
+v 7 L1
+e 0 1
+e 0 2
+e 1 2
+e 2 3
+e 3 4
+e 4 5
+e 4 6
+e 4 7
+e 5 6
+e 5 7
+e 6 7

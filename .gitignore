@@ -1,0 +1,23 @@
+# Graphs above 50 MB are not part of the repository (GitHub rejects blobs above
+# 100 MB and warns above 50 MB); they ship inside the release package instead.
+datasets/real/ogbn_products.graph
+datasets/real/us_patents.graph
+datasets/real/reddit.graph
+datasets/real/youtube.graph
+
+# Build products
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.index
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.swp
+*.swo
+*~
+.DS_Store

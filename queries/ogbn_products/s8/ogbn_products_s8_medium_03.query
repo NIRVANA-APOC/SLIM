@@ -1,0 +1,20 @@
+# CHIP_QUERY_V1
+t ogbn_products_s8_medium_03 8 10
+v 0 L7
+v 1 L7
+v 2 L7
+v 3 L7
+v 4 L7
+v 5 L7
+v 6 L7
+v 7 L7
+e 0 1
+e 1 2
+e 1 4
+e 1 7
+e 2 3
+e 3 4
+e 3 7
+e 4 5
+e 4 7
+e 5 6

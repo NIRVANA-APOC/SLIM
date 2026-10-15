@@ -1,0 +1,18 @@
+# CHIP_QUERY_V1
+t hprd_s8_medium_05 8 8
+v 0 L194
+v 1 L40
+v 2 L176
+v 3 L56
+v 4 L8
+v 5 L174
+v 6 L28
+v 7 L135
+e 0 1
+e 1 2
+e 2 3
+e 2 5
+e 3 4
+e 4 5
+e 5 6
+e 6 7

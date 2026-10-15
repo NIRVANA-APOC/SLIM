@@ -1,0 +1,37 @@
+# CHIP_QUERY_V1
+t hprd_s16_medium_09 16 19
+v 0 L9
+v 1 L48
+v 2 L69
+v 3 L9
+v 4 L9
+v 5 L5
+v 6 L130
+v 7 L8
+v 8 L48
+v 9 L1
+v 10 L7
+v 11 L56
+v 12 L39
+v 13 L107
+v 14 L30
+v 15 L9
+e 0 1
+e 0 7
+e 0 12
+e 0 13
+e 1 2
+e 2 3
+e 2 4
+e 2 10
+e 4 5
+e 4 6
+e 4 9
+e 7 8
+e 7 9
+e 9 13
+e 9 14
+e 10 11
+e 11 12
+e 13 14
+e 14 15

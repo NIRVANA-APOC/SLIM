@@ -1,0 +1,35 @@
+# CHIP_QUERY_V1
+t us_patents_s16_medium_06 16 17
+v 0 L6
+v 1 L7
+v 2 L19
+v 3 L16
+v 4 L14
+v 5 L13
+v 6 L2
+v 7 L12
+v 8 L17
+v 9 L13
+v 10 L5
+v 11 L14
+v 12 L2
+v 13 L9
+v 14 L13
+v 15 L7
+e 0 1
+e 0 2
+e 0 9
+e 0 11
+e 1 2
+e 2 3
+e 2 9
+e 3 4
+e 4 5
+e 4 6
+e 4 7
+e 7 8
+e 9 10
+e 11 12
+e 12 13
+e 13 14
+e 13 15

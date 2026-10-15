@@ -1,0 +1,35 @@
+# CHIP_QUERY_V1
+t youtube_s16_medium_05 16 17
+v 0 L6
+v 1 L15
+v 2 L7
+v 3 L14
+v 4 L23
+v 5 L22
+v 6 L6
+v 7 L12
+v 8 L14
+v 9 L24
+v 10 L22
+v 11 L16
+v 12 L19
+v 13 L4
+v 14 L18
+v 15 L12
+e 0 1
+e 0 2
+e 0 5
+e 0 10
+e 0 14
+e 2 3
+e 3 4
+e 3 10
+e 3 13
+e 5 6
+e 5 7
+e 5 8
+e 8 9
+e 10 11
+e 10 15
+e 11 12
+e 11 13

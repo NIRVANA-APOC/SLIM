@@ -1,0 +1,17 @@
+# CHIP_QUERY_V1
+t hprd_s8_sparse_05 8 7
+v 0 L1
+v 1 L1
+v 2 L7
+v 3 L89
+v 4 L65
+v 5 L7
+v 6 L9
+v 7 L61
+e 0 1
+e 0 5
+e 1 2
+e 2 3
+e 3 4
+e 5 6
+e 6 7

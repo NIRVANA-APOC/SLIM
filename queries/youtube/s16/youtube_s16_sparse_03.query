@@ -1,0 +1,33 @@
+# CHIP_QUERY_V1
+t youtube_s16_sparse_03 16 15
+v 0 L1
+v 1 L6
+v 2 L22
+v 3 L5
+v 4 L5
+v 5 L8
+v 6 L5
+v 7 L22
+v 8 L14
+v 9 L0
+v 10 L7
+v 11 L10
+v 12 L16
+v 13 L20
+v 14 L15
+v 15 L23
+e 0 1
+e 1 2
+e 1 6
+e 1 9
+e 1 10
+e 1 14
+e 1 15
+e 2 3
+e 3 4
+e 3 5
+e 6 7
+e 7 8
+e 10 11
+e 11 12
+e 11 13

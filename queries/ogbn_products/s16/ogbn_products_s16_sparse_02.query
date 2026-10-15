@@ -1,0 +1,35 @@
+# CHIP_QUERY_V1
+t ogbn_products_s16_sparse_02 16 17
+v 0 L6
+v 1 L6
+v 2 L6
+v 3 L6
+v 4 L6
+v 5 L6
+v 6 L6
+v 7 L21
+v 8 L21
+v 9 L21
+v 10 L6
+v 11 L6
+v 12 L6
+v 13 L6
+v 14 L6
+v 15 L4
+e 0 1
+e 1 2
+e 1 7
+e 1 9
+e 1 10
+e 1 11
+e 2 3
+e 3 4
+e 4 5
+e 4 6
+e 5 6
+e 7 8
+e 8 9
+e 11 12
+e 12 13
+e 13 14
+e 14 15

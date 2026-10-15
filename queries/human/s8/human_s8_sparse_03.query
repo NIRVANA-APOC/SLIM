@@ -1,0 +1,20 @@
+# CHIP_QUERY_V1
+t human_s8_sparse_03 8 10
+v 0 L9
+v 1 L65
+v 2 L65
+v 3 L2
+v 4 L2
+v 5 L3
+v 6 L2
+v 7 L3
+e 0 1
+e 1 2
+e 2 3
+e 3 4
+e 3 6
+e 3 7
+e 4 5
+e 4 6
+e 4 7
+e 6 7

@@ -1,0 +1,33 @@
+# CHIP_QUERY_V1
+t us_patents_s16_sparse_02 16 15
+v 0 L11
+v 1 L6
+v 2 L3
+v 3 L11
+v 4 L6
+v 5 L7
+v 6 L16
+v 7 L0
+v 8 L5
+v 9 L9
+v 10 L8
+v 11 L5
+v 12 L15
+v 13 L18
+v 14 L6
+v 15 L10
+e 0 1
+e 1 2
+e 2 3
+e 2 4
+e 2 6
+e 4 5
+e 6 7
+e 6 8
+e 8 9
+e 9 10
+e 10 11
+e 10 12
+e 12 13
+e 13 14
+e 14 15

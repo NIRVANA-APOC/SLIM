@@ -1,0 +1,24 @@
+# CHIP_QUERY_V1
+t ogbn_products_s8_dense_03 8 14
+v 0 L6
+v 1 L6
+v 2 L6
+v 3 L6
+v 4 L6
+v 5 L6
+v 6 L6
+v 7 L6
+e 0 1
+e 0 5
+e 0 6
+e 0 7
+e 1 2
+e 1 4
+e 1 6
+e 1 7
+e 2 3
+e 3 4
+e 4 6
+e 4 7
+e 5 6
+e 6 7

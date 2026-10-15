@@ -1,0 +1,22 @@
+# CHIP_QUERY_V1
+t us_patents_s8_dense_08 8 12
+v 0 L11
+v 1 L4
+v 2 L14
+v 3 L6
+v 4 L6
+v 5 L5
+v 6 L4
+v 7 L10
+e 0 1
+e 0 2
+e 0 6
+e 1 2
+e 1 5
+e 1 6
+e 2 3
+e 3 4
+e 3 6
+e 4 5
+e 5 7
+e 6 7

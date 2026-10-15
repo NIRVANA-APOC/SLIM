@@ -1,0 +1,33 @@
+# CHIP_QUERY_V1
+t hprd_s16_sparse_02 16 15
+v 0 L24
+v 1 L48
+v 2 L6
+v 3 L24
+v 4 L1
+v 5 L37
+v 6 L107
+v 7 L210
+v 8 L77
+v 9 L8
+v 10 L83
+v 11 L24
+v 12 L195
+v 13 L33
+v 14 L218
+v 15 L0
+e 0 1
+e 0 3
+e 0 10
+e 0 14
+e 1 2
+e 3 4
+e 4 5
+e 4 6
+e 6 7
+e 6 8
+e 8 9
+e 10 11
+e 10 12
+e 12 13
+e 14 15

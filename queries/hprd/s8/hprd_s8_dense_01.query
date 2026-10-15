@@ -1,0 +1,18 @@
+# CHIP_QUERY_V1
+t hprd_s8_dense_01 8 8
+v 0 L18
+v 1 L5
+v 2 L7
+v 3 L18
+v 4 L14
+v 5 L85
+v 6 L74
+v 7 L7
+e 0 1
+e 0 6
+e 1 2
+e 2 3
+e 3 4
+e 4 5
+e 5 6
+e 6 7

@@ -1,0 +1,18 @@
+# CHIP_QUERY_V1
+t wordnet_s8_medium_07 8 8
+v 0 L1
+v 1 L1
+v 2 L1
+v 3 L1
+v 4 L1
+v 5 L1
+v 6 L1
+v 7 L1
+e 0 1
+e 1 2
+e 1 6
+e 1 7
+e 2 3
+e 3 4
+e 3 5
+e 5 7

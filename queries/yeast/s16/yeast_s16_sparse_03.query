@@ -1,0 +1,35 @@
+# CHIP_QUERY_V1
+t yeast_s16_sparse_03 16 17
+v 0 L45
+v 1 L36
+v 2 L26
+v 3 L6
+v 4 L19
+v 5 L12
+v 6 L22
+v 7 L22
+v 8 L8
+v 9 L0
+v 10 L0
+v 11 L0
+v 12 L35
+v 13 L52
+v 14 L22
+v 15 L0
+e 0 1
+e 1 2
+e 1 3
+e 1 12
+e 1 13
+e 3 4
+e 3 5
+e 3 6
+e 3 8
+e 3 15
+e 6 7
+e 8 9
+e 8 14
+e 8 15
+e 9 10
+e 9 11
+e 10 11

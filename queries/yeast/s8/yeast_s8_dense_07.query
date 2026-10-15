@@ -1,0 +1,21 @@
+# CHIP_QUERY_V1
+t yeast_s8_dense_07 8 11
+v 0 L36
+v 1 L36
+v 2 L36
+v 3 L1
+v 4 L7
+v 5 L36
+v 6 L36
+v 7 L2
+e 0 1
+e 1 2
+e 1 4
+e 1 5
+e 2 3
+e 2 4
+e 3 6
+e 4 5
+e 4 6
+e 5 6
+e 6 7

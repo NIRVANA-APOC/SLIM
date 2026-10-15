@@ -1,0 +1,37 @@
+# CHIP_QUERY_V1
+t reddit_s16_medium_06 16 19
+v 0 L39
+v 1 L33
+v 2 L33
+v 3 L8
+v 4 L33
+v 5 L33
+v 6 L8
+v 7 L8
+v 8 L33
+v 9 L33
+v 10 L8
+v 11 L8
+v 12 L8
+v 13 L8
+v 14 L8
+v 15 L8
+e 0 1
+e 1 2
+e 1 10
+e 2 3
+e 2 4
+e 2 6
+e 3 4
+e 3 6
+e 4 5
+e 5 6
+e 6 7
+e 7 8
+e 8 9
+e 9 10
+e 10 11
+e 11 12
+e 12 13
+e 13 14
+e 14 15

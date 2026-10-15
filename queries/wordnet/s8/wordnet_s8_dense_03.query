@@ -1,0 +1,18 @@
+# CHIP_QUERY_V1
+t wordnet_s8_dense_03 8 8
+v 0 L2
+v 1 L2
+v 2 L1
+v 3 L1
+v 4 L1
+v 5 L1
+v 6 L2
+v 7 L1
+e 0 1
+e 1 2
+e 1 6
+e 2 3
+e 2 4
+e 2 5
+e 2 6
+e 6 7

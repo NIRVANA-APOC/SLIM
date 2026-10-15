@@ -1,0 +1,22 @@
+# CHIP_QUERY_V1
+t reddit_s8_dense_08 8 12
+v 0 L23
+v 1 L23
+v 2 L23
+v 3 L23
+v 4 L23
+v 5 L23
+v 6 L23
+v 7 L23
+e 0 1
+e 0 6
+e 0 7
+e 1 2
+e 1 6
+e 2 3
+e 2 4
+e 2 5
+e 3 4
+e 3 5
+e 4 5
+e 6 7

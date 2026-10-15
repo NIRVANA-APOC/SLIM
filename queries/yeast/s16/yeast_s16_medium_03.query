@@ -1,0 +1,37 @@
+# CHIP_QUERY_V1
+t yeast_s16_medium_03 16 19
+v 0 L2
+v 1 L3
+v 2 L3
+v 3 L2
+v 4 L2
+v 5 L7
+v 6 L17
+v 7 L3
+v 8 L3
+v 9 L2
+v 10 L3
+v 11 L2
+v 12 L2
+v 13 L2
+v 14 L17
+v 15 L38
+e 0 1
+e 0 10
+e 0 11
+e 0 12
+e 0 14
+e 1 2
+e 2 3
+e 2 4
+e 2 10
+e 3 4
+e 4 5
+e 5 6
+e 6 7
+e 6 8
+e 8 9
+e 9 10
+e 11 13
+e 12 13
+e 14 15

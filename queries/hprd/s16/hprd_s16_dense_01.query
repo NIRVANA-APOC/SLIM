@@ -1,0 +1,37 @@
+# CHIP_QUERY_V1
+t hprd_s16_dense_01 16 19
+v 0 L8
+v 1 L30
+v 2 L22
+v 3 L49
+v 4 L122
+v 5 L0
+v 6 L41
+v 7 L75
+v 8 L1
+v 9 L91
+v 10 L7
+v 11 L5
+v 12 L34
+v 13 L25
+v 14 L18
+v 15 L1
+e 0 1
+e 0 2
+e 0 8
+e 1 11
+e 2 3
+e 2 4
+e 2 5
+e 2 7
+e 2 8
+e 4 5
+e 5 6
+e 5 7
+e 7 8
+e 8 9
+e 8 15
+e 9 10
+e 11 12
+e 12 13
+e 12 14

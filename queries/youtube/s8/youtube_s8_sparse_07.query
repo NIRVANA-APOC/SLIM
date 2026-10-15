@@ -1,0 +1,17 @@
+# CHIP_QUERY_V1
+t youtube_s8_sparse_07 8 7
+v 0 L17
+v 1 L12
+v 2 L5
+v 3 L12
+v 4 L3
+v 5 L4
+v 6 L15
+v 7 L23
+e 0 1
+e 1 2
+e 2 3
+e 3 4
+e 4 5
+e 5 6
+e 6 7

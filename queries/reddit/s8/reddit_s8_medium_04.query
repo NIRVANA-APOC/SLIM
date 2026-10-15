@@ -1,0 +1,18 @@
+# CHIP_QUERY_V1
+t reddit_s8_medium_04 8 8
+v 0 L31
+v 1 L31
+v 2 L16
+v 3 L35
+v 4 L35
+v 5 L26
+v 6 L26
+v 7 L14
+e 0 1
+e 1 2
+e 2 3
+e 2 6
+e 3 4
+e 4 5
+e 5 6
+e 6 7

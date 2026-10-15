@@ -1,0 +1,18 @@
+# CHIP_QUERY_V1
+t dblp_s8_sparse_03 8 8
+v 0 L4
+v 1 L8
+v 2 L7
+v 3 L12
+v 4 L13
+v 5 L5
+v 6 L0
+v 7 L5
+e 0 1
+e 1 2
+e 1 4
+e 1 5
+e 1 6
+e 1 7
+e 2 3
+e 4 5

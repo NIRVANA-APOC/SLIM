@@ -1,0 +1,33 @@
+# CHIP_QUERY_V1
+t reddit_s16_sparse_01 16 15
+v 0 L8
+v 1 L8
+v 2 L37
+v 3 L37
+v 4 L37
+v 5 L37
+v 6 L8
+v 7 L8
+v 8 L8
+v 9 L8
+v 10 L8
+v 11 L8
+v 12 L17
+v 13 L25
+v 14 L25
+v 15 L8
+e 0 1
+e 0 2
+e 0 6
+e 0 9
+e 0 15
+e 2 3
+e 3 4
+e 4 5
+e 6 7
+e 7 8
+e 9 10
+e 10 11
+e 11 12
+e 12 13
+e 13 14

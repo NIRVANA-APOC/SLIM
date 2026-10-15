@@ -1,0 +1,37 @@
+# CHIP_QUERY_V1
+t us_patents_s16_dense_00 16 19
+v 0 L6
+v 1 L8
+v 2 L10
+v 3 L5
+v 4 L5
+v 5 L0
+v 6 L19
+v 7 L0
+v 8 L3
+v 9 L0
+v 10 L4
+v 11 L6
+v 12 L19
+v 13 L5
+v 14 L8
+v 15 L10
+e 0 1
+e 0 2
+e 0 3
+e 0 10
+e 0 11
+e 0 15
+e 3 4
+e 3 8
+e 4 5
+e 4 9
+e 5 6
+e 5 7
+e 5 8
+e 6 7
+e 6 8
+e 8 9
+e 11 12
+e 11 13
+e 13 14
