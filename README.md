@@ -1,8 +1,9 @@
 # SLIM: Spectral Laplacian Interlacing Matcher
 
 A C++17 implementation of *SLIM: Exact Subgraph Matching via Spectral Dominance*:
-`slim_index` builds the spectral signatures and the dominance index offline,
-`slim_query` runs spectral filtering followed by exact enumeration online.
+`slim_index` builds the spectral signatures and the multi-rank dominance index
+offline, `slim_query` runs spectral filtering followed by exact enumeration
+online.
 
 ## Build
 
@@ -13,6 +14,37 @@ cmake --build build -j
 
 Artifacts: `build/slim_index` (offline) and `build/slim_query` (online);
 `build/slim_offline` and `build/slim_online` are compatibility symlinks to them.
+
+## Index
+
+`slim_index` writes one index file per data graph: the local spectral
+signatures, the label histograms, the `(label, layer, dimension)` partitions and
+the adaptive multi-rank (AMSD) retrieval section the online stage runs on.
+
+That section indexes, per label partition, the threshold families of the top
+spectral coordinates of each signature: for rank `j` the family is a ladder of
+decreasing thresholds, and rung `b` labels the vertices whose `j`-th largest
+stored eigenvalue is at least that threshold. A query threshold that falls
+between two rungs uses the next rung down, which can only keep extra vertices
+that the exact test then removes. The `j`-th coordinate inequality is a
+necessary condition of spectral dominance for every `j`, so a query vertex can
+intersect any subset of the ranks, in any order, and stop at any time; the exact
+dominance test decides the final candidate set, which therefore does not depend
+on how much of the retrieval ran before it. Besides the rank families the
+section carries each partition's degrees (a contiguous read instead of one
+random access into the data graph) and the dimension condition
+`|sigma(v)| >= |sigma(u)|`, materialized from the partition metadata on demand
+and therefore free in storage.
+
+For every query vertex the online stage picks the mechanism its cost model
+expects to pay for: the threshold bitmaps, a per-candidate rank test inside the
+partition scan, or the plain partition scan. The index is built with up to 6
+ranks and up to 32 rungs per rank; `slim_index --verbose` prints the ranks, the
+rungs and the bitmap bytes it produced.
+
+Index files carry format version 2. A file written by an older build has no
+multi-rank section and is refused at load time (`the index has no multi-rank
+index section`): rebuild it with this `slim_index`.
 
 ## Contents
 
@@ -138,7 +170,7 @@ interest. Other datasets work the same way: replace `-d` with
 | `candidates_after_propagation` | `Σ_u \|C(u)\|` after propagation |
 | `match_count` | embeddings found (capped by `--limit`) |
 | `early_stopped` | 1 when enumeration stopped at the match limit |
-| `coarse_dominance_checks`, `full_dominance_checks` | pairs that entered the index-key scan and the full dominance test |
+| `coarse_dominance_checks`, `full_dominance_checks` | pairs that entered the index-level retrieval and the full dominance test |
 | `data_vertices`, `query_vertices`, `query_edges` | sizes of the data graph and the query graph |
 
 ## Command-line reference

@@ -42,6 +42,8 @@ void SlimMatcher::set_data_graph(LabeledGraph data_graph, VerifierBackend backen
         filter_->set_label_filter(label_filter_);
         filter_->set_spectral_filter(spectral_filter_);
         filter_->set_query_radius(query_radius_);
+        filter_->set_amsd_adaptive(amsd_adaptive_);
+        filter_->set_stage_timings(stage_timings_);
     } else {
         validate_cumulative_index_set(pending_indexes_, data_graph_);
         cumulative_filter_ = std::make_unique<CumulativeSpectralFilter>(
@@ -49,6 +51,7 @@ void SlimMatcher::set_data_graph(LabeledGraph data_graph, VerifierBackend backen
         cumulative_filter_->set_channel_stats(channel_stats_);
         cumulative_filter_->set_label_filter(label_filter_);
         cumulative_filter_->set_spectral_filter(spectral_filter_);
+        cumulative_filter_->set_amsd_adaptive(amsd_adaptive_);
     }
     verifier_ = std::make_unique<BacktrackingVerifier>(data_graph_, backend);
 }
@@ -189,6 +192,22 @@ MatchResult SlimMatcher::match(const LabeledGraph& query_graph,
     stats->key_rejects = filter.key_rejects();
     stats->win_rejects = filter.win_rejects();
     stats->empty_accepts = filter.empty_accepts();
+    stats->amsd_adaptive = filter.amsd_adaptive();
+    stats->amsd_active_vertices = filter.amsd_active_vertices();
+    stats->amsd_rank_ands = filter.amsd_rank_ands();
+    stats->amsd_rank_ands_skipped = filter.amsd_rank_ands_skipped();
+    stats->amsd_ranks_unavailable = filter.amsd_ranks_unavailable();
+    stats->amsd_direct_scans = filter.amsd_direct_scans();
+    stats->amsd_region = filter.amsd_region();
+    stats->amsd_enumerated = filter.amsd_enumerated();
+    stats->amsd_preempted = filter.amsd_preempted();
+    stats->amsd_bucket_scan_vertices = filter.amsd_bucket_scan_vertices();
+    stats->amsd_bit_test_vertices = filter.amsd_bit_test_vertices();
+    stats->amsd_bitmap_vertices = filter.amsd_bitmap_vertices();
+    stats->amsd_chain_tests = filter.amsd_chain_tests();
+    stats->amsd_chain_rejections = filter.amsd_chain_rejections();
+    stats->amsd_chain_enabled_scans = filter.amsd_chain_enabled_scans();
+    stats->dispatch_ns = filter.dispatch_ns();
 
     if (!candidate_dump_path_.empty()) {
         write_candidate_dump(candidate_dump_path_, candidate_buffer_);

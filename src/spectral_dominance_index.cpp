@@ -27,6 +27,9 @@ constexpr std::size_t IO_BUFFER = 1u << 20;
 
 constexpr char INDEX_IDENTITY_MAGIC[8] = {'S', 'L', 'I', 'M', 'I', 'D', 'X', '1'};
 
+constexpr char INDEX_AMSD_MAGIC[8] = {'S', 'L', 'I', 'M', 'A', 'M', 'S', 'D'};
+constexpr std::uint32_t AMSD_SECTION_VERSION = 1;
+
 class BinaryWriter {
 public:
     explicit BinaryWriter(const std::string& path)
@@ -157,8 +160,7 @@ std::uint32_t read_dimension(BinaryReader& in) {
 }
 
 float ceil_to_float(double value) {
-    const float rounded = static_cast<float>(value);
-    return static_cast<double>(rounded) < value ? std::nextafter(rounded, INFINITY) : rounded;
+    return static_cast<float>(stored_spectral_value(value));
 }
 
 void write_signature(BinaryWriter& out, const LocalSpectralSignature& signature,
@@ -197,6 +199,16 @@ const SpectralDominanceIndex::LabelGroup* SpectralDominanceIndex::find_group(Lab
         return nullptr;
     }
     return &*it;
+}
+
+std::size_t SpectralDominanceIndex::group_position(Label label) const {
+    const auto it = std::lower_bound(
+        groups_.begin(), groups_.end(), label,
+        [](const LabelGroup& group, Label value) { return group.label < value; });
+    if (it == groups_.end() || it->label != label) {
+        return groups_.size();
+    }
+    return static_cast<std::size_t>(it - groups_.begin());
 }
 
 const SpectralDominanceIndex::EmptyGroup* SpectralDominanceIndex::find_empty_group(Label label) const {
@@ -259,6 +271,37 @@ void SpectralDominanceIndex::save(const std::string& path) const {
     out.pod(identity_.data_vertices);
     out.pod(identity_.data_edges);
     out.pod(identity_.tau_scale);
+
+    if (amsd_.present) {
+        out.bytes(INDEX_AMSD_MAGIC, sizeof(INDEX_AMSD_MAGIC));
+        out.pod(AMSD_SECTION_VERSION);
+        out.pod(amsd_.configured_ranks);
+        out.pod(amsd_.configured_bins);
+        out.pod(static_cast<std::uint32_t>(amsd_.degrees.size()));
+        out.bytes(reinterpret_cast<const char*>(amsd_.degrees.data()),
+                  amsd_.degrees.size() * sizeof(std::uint32_t));
+        out.pod(static_cast<std::uint32_t>(amsd_.groups.size()));
+        for (const AmsdGroup& group : amsd_.groups) {
+            out.pod(group.label);
+            out.pod(group.size);
+            out.pod(static_cast<std::uint32_t>(group.ranks.size()));
+            for (const AmsdRankIndex& rank : group.ranks) {
+                out.pod(rank.rank);
+                out.pod(static_cast<std::uint32_t>(rank.rungs.size()));
+                for (double rung : rank.rungs) {
+                    out.pod(rung);
+                }
+                for (std::uint32_t cardinality : rank.suffix_sets) {
+                    out.pod(cardinality);
+                }
+                const std::size_t words = (static_cast<std::size_t>(group.size) + 63) / 64;
+                for (const BitVector& bits : rank.suffix) {
+                    out.bytes(reinterpret_cast<const char*>(bits.word_data()),
+                              words * sizeof(std::uint64_t));
+                }
+            }
+        }
+    }
     out.flush();
 }
 
@@ -353,6 +396,58 @@ std::unique_ptr<SpectralDominanceIndex> SpectralDominanceIndex::load(const std::
         }
     } catch (const std::exception&) {
         index->has_identity_ = false;
+    }
+
+    try {
+        char magic[sizeof(INDEX_AMSD_MAGIC)];
+        in.bytes(magic, sizeof(magic));
+        if (std::memcmp(magic, INDEX_AMSD_MAGIC, sizeof(magic)) == 0) {
+            const std::uint32_t version = in.pod<std::uint32_t>();
+            if (version != AMSD_SECTION_VERSION) {
+                throw std::runtime_error("unknown AMSD section version");
+            }
+            index->amsd_.present = true;
+            index->amsd_.configured_ranks = in.pod<std::uint32_t>();
+            index->amsd_.configured_bins = in.pod<std::uint32_t>();
+            const std::uint32_t num_vertices_with_degrees = in.pod<std::uint32_t>();
+            index->amsd_.degrees.resize(static_cast<std::size_t>(num_vertices_with_degrees));
+            in.bytes(reinterpret_cast<char*>(index->amsd_.degrees.data()),
+                     index->amsd_.degrees.size() * sizeof(std::uint32_t));
+            const std::uint32_t num_groups = in.pod<std::uint32_t>();
+            index->amsd_.groups.resize(static_cast<std::size_t>(num_groups));
+            for (std::size_t g = 0; g < num_groups; ++g) {
+                AmsdGroup& group = index->amsd_.groups[g];
+                group.label = in.pod<Label>();
+                group.size = in.pod<std::uint32_t>();
+                const std::uint32_t num_ranks = in.pod<std::uint32_t>();
+                group.ranks.resize(static_cast<std::size_t>(num_ranks));
+                const std::size_t words = (static_cast<std::size_t>(group.size) + 63) / 64;
+                for (std::size_t r = 0; r < num_ranks; ++r) {
+                    AmsdRankIndex& rank = group.ranks[r];
+                    rank.rank = in.pod<std::uint32_t>();
+                    const std::uint32_t num_rungs = in.pod<std::uint32_t>();
+                    rank.rungs.resize(static_cast<std::size_t>(num_rungs));
+                    for (std::size_t b = 0; b < num_rungs; ++b) {
+                        rank.rungs[b] = in.pod<double>();
+                    }
+                    rank.suffix_sets.resize(static_cast<std::size_t>(num_rungs));
+                    for (std::size_t b = 0; b < num_rungs; ++b) {
+                        rank.suffix_sets[b] = in.pod<std::uint32_t>();
+                    }
+                    rank.suffix.resize(static_cast<std::size_t>(num_rungs));
+                    for (std::size_t b = 0; b < num_rungs; ++b) {
+                        rank.suffix[b].resize_bits(static_cast<std::size_t>(group.size));
+                        in.bytes(reinterpret_cast<char*>(rank.suffix[b].word_data()),
+                                 words * sizeof(std::uint64_t));
+                    }
+                    index->amsd_.bitmap_bytes +=
+                        static_cast<std::uint64_t>(num_rungs) *
+                        static_cast<std::uint64_t>(words) * sizeof(std::uint64_t);
+                }
+            }
+        }
+    } catch (const std::exception&) {
+        index->amsd_ = AmsdIndex();
     }
 
     return index;
@@ -621,6 +716,30 @@ std::unique_ptr<SpectralDominanceIndex> OfflineIndexBuilder::build() {
     index->alphabet_ = std::move(alphabet);
     index->ball_counts_ = std::move(ball_counts);
     index->has_ball_labels_ = true;
+
+    const auto assemble_end = std::chrono::steady_clock::now();
+    timings_.assemble_ms = static_cast<std::uint64_t>(std::chrono::duration_cast<
+        std::chrono::milliseconds>(assemble_end - preprocess_end).count());
+
+    const auto amsd_start = std::chrono::steady_clock::now();
+    if (config_.amsd_ranks > 0) {
+        std::vector<AmsdBuildGroup> amsd_groups;
+        amsd_groups.reserve(index->groups_.size());
+        for (const SpectralDominanceIndex::LabelGroup& group : index->groups_) {
+            amsd_groups.push_back({group.label, group.vertices.data(), group.vertices.size()});
+        }
+        std::vector<std::uint32_t> degrees(num_vertices, 0);
+        for (VertexId v = 0; v < num_vertices; ++v) {
+            degrees[v] = static_cast<std::uint32_t>(graph_.degree(v));
+        }
+        index->amsd_ = build_amsd_index(amsd_groups, index->signatures_, degrees,
+                                        static_cast<std::uint32_t>(config_.amsd_ranks),
+                                        static_cast<std::uint32_t>(config_.amsd_bins));
+    }
+    const auto amsd_end = std::chrono::steady_clock::now();
+    timings_.amsd_ms = static_cast<std::uint64_t>(std::chrono::duration_cast<
+        std::chrono::milliseconds>(amsd_end - amsd_start).count());
+
     index->identity_.format_version = INDEX_FORMAT_VERSION;
     index->identity_.data_fingerprint = data_graph_fingerprint(graph_);
     index->identity_.label_fingerprint = label_alphabet_fingerprint(graph_);
@@ -630,9 +749,6 @@ std::unique_ptr<SpectralDominanceIndex> OfflineIndexBuilder::build() {
     index->identity_.tau_scale = config_.tau_scale;
     index->has_identity_ = true;
 
-    const auto assemble_end = std::chrono::steady_clock::now();
-    timings_.assemble_ms = static_cast<std::uint64_t>(std::chrono::duration_cast<
-        std::chrono::milliseconds>(assemble_end - preprocess_end).count());
     return index;
 }
 }

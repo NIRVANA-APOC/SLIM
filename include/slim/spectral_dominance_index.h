@@ -1,6 +1,7 @@
 #ifndef SLIM_SPECTRAL_DOMINANCE_INDEX_H
 #define SLIM_SPECTRAL_DOMINANCE_INDEX_H
 
+#include <slim/amsd_index.h>
 #include <slim/config.h>
 #include <slim/label_encoder.h>
 #include <slim/labeled_graph.h>
@@ -13,7 +14,7 @@
 #include <vector>
 
 namespace slim {
-constexpr std::uint32_t INDEX_FORMAT_VERSION = 1;
+constexpr std::uint32_t INDEX_FORMAT_VERSION = 2;
 
 class SpectralDominanceIndex {
 public:
@@ -74,6 +75,14 @@ public:
     const LabelGroup* find_group(Label label) const;
     const EmptyGroup* find_empty_group(Label label) const;
 
+    std::size_t group_position(Label label) const;
+
+    bool has_amsd() const { return amsd_.present; }
+    const AmsdIndex& amsd() const { return amsd_; }
+    const AmsdGroup* amsd_group_at(std::size_t position) const {
+        return position < amsd_.groups.size() ? &amsd_.groups[position] : nullptr;
+    }
+
     void save(const std::string& path) const;
     static std::unique_ptr<SpectralDominanceIndex> load(const std::string& path);
 
@@ -88,6 +97,7 @@ private:
     std::vector<LocalSpectralSignature> signatures_;
     std::vector<LabelGroup> groups_;
     std::vector<EmptyGroup> empty_groups_;
+    AmsdIndex amsd_;
 
     bool has_ball_labels_ = false;
     std::uint32_t num_labels_ = 0;
@@ -102,6 +112,7 @@ public:
     struct BuildTimings {
         std::uint64_t preprocess_ms = 0;
         std::uint64_t assemble_ms = 0;
+        std::uint64_t amsd_ms = 0;
     };
 
     explicit OfflineIndexBuilder(const LabeledGraph& graph, SlimConfig config);

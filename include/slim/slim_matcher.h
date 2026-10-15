@@ -56,6 +56,23 @@ struct MatchStats {
     std::uint64_t win_rejects = 0;
     std::uint64_t empty_accepts = 0;
 
+    bool amsd_adaptive = true;
+    std::uint64_t amsd_active_vertices = 0;
+    std::uint64_t amsd_rank_ands = 0;
+    std::uint64_t amsd_rank_ands_skipped = 0;
+    std::uint64_t amsd_ranks_unavailable = 0;
+    std::uint64_t amsd_direct_scans = 0;
+    std::uint64_t amsd_region = 0;
+    std::uint64_t amsd_enumerated = 0;
+    std::uint64_t amsd_preempted = 0;
+    std::uint64_t amsd_bucket_scan_vertices = 0;
+    std::uint64_t amsd_bit_test_vertices = 0;
+    std::uint64_t amsd_bitmap_vertices = 0;
+    std::uint64_t amsd_chain_tests = 0;
+    std::uint64_t amsd_chain_rejections = 0;
+    std::uint64_t amsd_chain_enabled_scans = 0;
+    std::uint64_t dispatch_ns = 0;
+
     bool label_filter_active = false;
 };
 
@@ -90,6 +107,13 @@ public:
 
     void set_channel_stats(bool enabled) { channel_stats_ = enabled; }
 
+    void set_stage_timings(bool enabled) {
+        stage_timings_ = enabled;
+        if (filter_ != nullptr) {
+            filter_->set_stage_timings(enabled);
+        }
+    }
+
     void set_label_filter(bool enabled) { label_filter_ = enabled; }
     void set_spectral_filter(bool enabled) { spectral_filter_ = enabled; }
 
@@ -97,6 +121,16 @@ public:
         query_radius_ = radius;
         if (filter_ != nullptr) {
             filter_->set_query_radius(radius);
+        }
+    }
+
+    void set_amsd_adaptive(bool adaptive) {
+        amsd_adaptive_ = adaptive;
+        if (filter_ != nullptr) {
+            filter_->set_amsd_adaptive(adaptive);
+        }
+        if (cumulative_filter_ != nullptr) {
+            cumulative_filter_->set_amsd_adaptive(adaptive);
         }
     }
 
@@ -121,6 +155,8 @@ private:
     int query_radius_ = 0;
     bool label_filter_ = true;
     bool spectral_filter_ = true;
+    bool amsd_adaptive_ = true;
+    bool stage_timings_ = false;
     std::string candidate_dump_path_;
     std::string layer_dump_dir_;
     std::string layer_dump_stem_;

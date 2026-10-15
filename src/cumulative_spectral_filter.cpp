@@ -301,6 +301,7 @@ void CumulativeSpectralFilter::filter_into(const LabeledGraph& query_graph, Cand
         layer.filter->set_label_filter(label_filter_);
         layer.filter->set_spectral_filter(spectral_filter_);
         layer.filter->set_channel_stats(channel_stats_);
+        layer.filter->set_amsd_adaptive(amsd_adaptive_);
         layer.filter->filter_into(query_graph, layer.query_signatures, layer_out_);
 
         if (i == 0) {

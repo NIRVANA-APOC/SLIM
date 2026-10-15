@@ -3,6 +3,7 @@
 
 #include <slim/types.h>
 
+#include <cmath>
 #include <cstddef>
 #include <vector>
 
@@ -63,6 +64,12 @@ struct LocalSpectralSignature {
 inline bool spectral_dominance(const LocalSpectralSignature& dominated,
                                const LocalSpectralSignature& dominator) {
     return dominator.dominates(dominated);
+}
+
+inline double stored_spectral_value(double value) {
+    const float rounded = static_cast<float>(value);
+    return static_cast<double>(rounded) < value ? static_cast<double>(std::nextafter(rounded, INFINITY))
+                                                : static_cast<double>(rounded);
 }
 }
 

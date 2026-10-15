@@ -16,6 +16,12 @@ void SlimConfig::validate() const {
     if (threads < 1) {
         throw std::invalid_argument("threads must be >= 1");
     }
+    if (amsd_ranks < 0) {
+        throw std::invalid_argument("amsd_ranks must be >= 0 (0 disables the rank families)");
+    }
+    if (amsd_bins < 1) {
+        throw std::invalid_argument("amsd_bins must be >= 1");
+    }
 }
 
 RadiusMode radius_mode_from_string(const std::string& text) {

@@ -21,6 +21,10 @@ struct SlimConfig {
 
     int threads = 1;
 
+    int amsd_ranks = 6;
+
+    int amsd_bins = 32;
+
     void validate() const;
 };
 }

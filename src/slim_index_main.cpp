@@ -94,6 +94,9 @@ int main(int argc, char** argv) {
             std::cout << "signatures: " << graph.num_vertices()
                       << " vertices\n";
             std::cout << "tau: " << index->tau() << "\n";
+            std::cout << "multi-rank index: ranks<=" << index->amsd().configured_ranks
+                      << " bins<=" << index->amsd().configured_bins
+                      << " bitmap-bytes: " << index->amsd().bitmap_bytes << "\n";
             if (options.config.neighborhood_size_limit > 0) {
                 std::cout << "neighborhood-size-limit: "
                           << options.config.neighborhood_size_limit << "\n";

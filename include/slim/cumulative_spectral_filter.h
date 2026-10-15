@@ -70,6 +70,8 @@ public:
     void set_spectral_filter(bool enabled) { spectral_filter_ = enabled; }
     void set_channel_stats(bool enabled) { channel_stats_ = enabled; }
 
+    void set_amsd_adaptive(bool adaptive) { amsd_adaptive_ = adaptive; }
+
     void set_layer_dump_dir(std::string dir, std::string stem) {
         layer_dump_dir_ = std::move(dir);
         layer_dump_stem_ = std::move(stem);
@@ -92,6 +94,7 @@ private:
     bool label_filter_ = true;
     bool spectral_filter_ = true;
     bool channel_stats_ = false;
+    bool amsd_adaptive_ = true;
     std::string layer_dump_dir_;
     std::string layer_dump_stem_;
 
