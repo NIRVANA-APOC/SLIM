@@ -4,10 +4,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <map>
 #include <numeric>
-#include <utility>
 #include <vector>
 
 namespace slim {
@@ -158,28 +156,6 @@ double conditional_entropy(const RankLayout& layout, std::uint32_t rank, std::si
     return sum / static_cast<double>(limit);
 }
 
-void compute_rank_stats(const RankLayout& layout, RankSelectionResult& result) {
-    const std::size_t rank_count = static_cast<std::size_t>(layout.max_rank);
-    result.c_j.assign(rank_count, 0);
-    result.h_j.assign(rank_count, 0.0);
-    result.d_j.assign(rank_count, 0.0);
-    for (std::uint32_t rank = 1; rank <= layout.max_rank; ++rank) {
-        result.c_j[rank - 1] = layout.c[rank];
-    }
-    std::vector<std::uint32_t> cells;
-    std::vector<std::uint64_t> row_sums;
-    for (std::uint32_t rank = 1; rank <= layout.max_rank; ++rank) {
-        const std::uint64_t count = layout.c[rank];
-        if (count < 2) {
-            continue;
-        }
-        const double entropy = conditional_entropy(layout, rank, static_cast<std::size_t>(count),
-                                                   cells, row_sums);
-        result.h_j[rank - 1] = entropy;
-        result.d_j[rank - 1] = entropy > 0.0 ? entropy / std::log(static_cast<double>(count)) : 0.0;
-    }
-}
-
 double conditional_nmi(const RankLayout& layout, std::uint32_t rank_i, std::uint32_t rank_j) {
     const std::uint32_t max_rank = std::max(rank_i, rank_j);
     const std::size_t limit = layout.c[max_rank];
@@ -221,7 +197,8 @@ double conditional_nmi(const RankLayout& layout, std::uint32_t rank_i, std::uint
         const std::uint64_t key = keys[begin];
         const std::uint32_t bucket_j = static_cast<std::uint32_t>(key % cols);
         const std::uint32_t bucket_i = static_cast<std::uint32_t>((key / cols) % cols);
-        const std::uint32_t z = static_cast<std::uint32_t>(key / (static_cast<std::uint64_t>(cols) * cols));
+        const std::uint32_t z =
+            static_cast<std::uint32_t>(key / (static_cast<std::uint64_t>(cols) * cols));
         const std::uint32_t count = static_cast<std::uint32_t>(end - begin);
         hist_i[static_cast<std::size_t>(z) * cols + bucket_i] += count;
         hist_j[static_cast<std::size_t>(z) * cols + bucket_j] += count;
@@ -273,222 +250,114 @@ double conditional_nmi(const RankLayout& layout, std::uint32_t rank_i, std::uint
     }
     return std::min(1.0, nmi);
 }
-
-std::vector<std::uint32_t> uniform_ranks(const RankLayout& layout, double budget) {
-    std::vector<std::uint32_t> best;
-    std::uint64_t best_space = 0;
-    for (std::uint32_t k = 1; k <= layout.max_rank; ++k) {
-        std::vector<std::uint32_t> ranks;
-        ranks.reserve(k);
-        if (k == 1) {
-            ranks.push_back(1);
-        } else {
-            const double step = static_cast<double>(layout.max_rank - 1) / static_cast<double>(k - 1);
-            for (std::uint32_t i = 0; i < k; ++i) {
-                const auto rank = static_cast<std::uint32_t>(
-                    1.0 + std::llround(static_cast<double>(i) * step));
-                if (rank >= 1 && rank <= layout.max_rank) {
-                    ranks.push_back(rank);
-                }
-            }
-            std::sort(ranks.begin(), ranks.end());
-            ranks.erase(std::unique(ranks.begin(), ranks.end()), ranks.end());
-        }
-        std::uint64_t space = 0;
-        for (std::uint32_t rank : ranks) {
-            space += layout.c[rank];
-        }
-        const bool fits = static_cast<double>(space) <= budget + 0.5;
-        if (fits && (ranks.size() > best.size() ||
-                     (ranks.size() == best.size() && space < best_space))) {
-            best = std::move(ranks);
-            best_space = space;
-        }
-    }
-    return best;
-}
 }
 
 RankSelectionResult select_rank_set(const std::vector<LocalSpectralSignature>& signatures,
                                     const RankSelectionOptions& options) {
     RankSelectionResult result;
-    result.mode = options.mode;
-    result.tau = options.tau;
-    result.num_vertices = options.num_vertices;
-    result.budget_entries = options.budget_entries;
-    result.max_rank = std::min<std::uint32_t>(options.max_rank, 1u << 20);
-
-    if (options.mode == RankSelectMode::All) {
-        result.selected_ranks = options.fallback_ranks;
-        std::sort(result.selected_ranks.begin(), result.selected_ranks.end());
-        result.selected_ranks.erase(
-            std::unique(result.selected_ranks.begin(), result.selected_ranks.end()),
-            result.selected_ranks.end());
-        result.selection_order = result.selected_ranks;
-        const RankLayout layout = build_layout(signatures, options.tau, result.max_rank);
-        result.max_rank = layout.max_rank;
-        compute_rank_stats(layout, result);
-        std::uint64_t space = 0;
-        for (std::uint32_t rank : result.selected_ranks) {
-            if (rank <= layout.max_rank) {
-                space += layout.c[rank];
-                result.selected_entries.push_back(layout.c[rank]);
-            }
-        }
-        result.space_entries = space;
-        return result;
-    }
-
-    const RankLayout layout = build_layout(signatures, options.tau, result.max_rank);
-    result.max_rank = layout.max_rank;
-    compute_rank_stats(layout, result);
-
+    const std::uint32_t cap = std::min<std::uint32_t>(options.max_rank, 1u << 20);
+    const RankLayout layout = build_layout(signatures, options.tau, cap);
     if (layout.max_rank == 0 || layout.num_vertices == 0) {
         return result;
     }
 
-    if (options.mode == RankSelectMode::Rank1) {
-        if (layout.c[1] > 0) {
-            result.selected_ranks = {1};
-            result.selected_entries = {layout.c[1]};
-            result.space_entries = layout.c[1];
-            result.selection_order = {1};
-        }
-        return result;
-    }
-
-    if (options.mode == RankSelectMode::Adaptive) {
-        std::map<std::uint64_t, double> nmi_cache;
-        const auto nmi_of = [&](std::uint32_t rank_a, std::uint32_t rank_b) {
-            const std::uint32_t lo = std::min(rank_a, rank_b);
-            const std::uint32_t hi = std::max(rank_a, rank_b);
-            const std::uint64_t key =
-                (static_cast<std::uint64_t>(lo) << 32) | static_cast<std::uint64_t>(hi);
-            const auto it = nmi_cache.find(key);
-            if (it != nmi_cache.end()) {
-                return it->second;
-            }
-            const double value = conditional_nmi(layout, lo, hi);
-            nmi_cache.emplace(key, value);
-            result.nmi_calls.push_back({lo, hi, value});
-            return value;
-        };
-
-        struct Candidate {
-            std::uint32_t rank;
-            double bound;
-        };
-        std::vector<Candidate> candidates;
-        candidates.reserve(layout.max_rank);
-        for (std::uint32_t rank = 1; rank <= layout.max_rank; ++rank) {
-            const std::uint64_t count = layout.c[rank];
-            if (count < 2 || result.d_j[rank - 1] <= 0.0) {
-                continue;
-            }
-            if (static_cast<double>(count) > options.budget_entries + 0.5) {
-                continue;
-            }
-            const double bound = static_cast<double>(count) /
-                                 static_cast<double>(layout.num_vertices) *
-                                 result.d_j[rank - 1];
-            candidates.push_back({rank, bound});
-        }
-        std::sort(candidates.begin(), candidates.end(), [&result](const Candidate& a,
-                                                                  const Candidate& b) {
-            if (a.bound != b.bound) {
-                return a.bound > b.bound;
-            }
-            const std::uint64_t ca = result.c_j[a.rank - 1];
-            const std::uint64_t cb = result.c_j[b.rank - 1];
-            if (ca != cb) {
-                return ca > cb;
-            }
-            return a.rank < b.rank;
-        });
-
-        std::vector<bool> selected(static_cast<std::size_t>(layout.max_rank) + 1, false);
-        std::uint64_t space = 0;
-        while (true) {
-            std::uint32_t best_rank = 0;
-            double best_delta = 0.0;
-            for (const Candidate& candidate : candidates) {
-                if (selected[candidate.rank]) {
-                    continue;
-                }
-                if (static_cast<double>(space) + static_cast<double>(layout.c[candidate.rank]) >
-                    options.budget_entries + 0.5) {
-                    continue;
-                }
-                if (best_rank != 0 && candidate.bound < best_delta - kTieEps) {
-                    break;
-                }
-                double max_nmi = 0.0;
-                for (std::uint32_t chosen : result.selected_ranks) {
-                    max_nmi = std::max(max_nmi, nmi_of(chosen, candidate.rank));
-                }
-                const double delta = candidate.bound * (1.0 - max_nmi);
-                if (delta > best_delta + kTieEps) {
-                    best_delta = delta;
-                    best_rank = candidate.rank;
-                }
-            }
-            if (best_rank == 0) {
-                break;
-            }
-            selected[best_rank] = true;
-            result.selected_ranks.push_back(best_rank);
-            result.selection_order.push_back(best_rank);
-            result.selected_entries.push_back(layout.c[best_rank]);
-            space += layout.c[best_rank];
-            if (static_cast<double>(space) + 1.0 > options.budget_entries + 0.5) {
-                break;
-            }
-        }
-        std::sort(result.selected_ranks.begin(), result.selected_ranks.end());
-        result.space_entries = space;
-        return result;
-    }
-
-    result.selected_ranks = uniform_ranks(layout, options.budget_entries);
-    result.selection_order = result.selected_ranks;
-    std::uint64_t space = 0;
-    for (std::uint32_t rank : result.selected_ranks) {
-        space += layout.c[rank];
-        result.selected_entries.push_back(layout.c[rank]);
-    }
-    result.space_entries = space;
-    return result;
-}
-
-double normalized_conditional_entropy(const std::vector<LocalSpectralSignature>& signatures,
-                                      std::size_t num_vertices, double tau, std::uint32_t rank,
-                                      std::uint32_t* count_out) {
-    RankLayout layout = build_layout(signatures, tau, rank);
-    if (rank == 0 || rank > layout.max_rank || layout.num_vertices != num_vertices) {
-        if (count_out != nullptr) {
-            *count_out = 0;
-        }
-        return 0.0;
-    }
-    if (count_out != nullptr) {
-        *count_out = static_cast<std::uint32_t>(layout.c[rank]);
-    }
+    std::vector<double> d_j(layout.max_rank, 0.0);
     std::vector<std::uint32_t> cells;
     std::vector<std::uint64_t> row_sums;
-    return conditional_entropy(layout, rank, static_cast<std::size_t>(layout.c[rank]), cells,
-                               row_sums);
-}
+    for (std::uint32_t rank = 1; rank <= layout.max_rank; ++rank) {
+        const std::uint64_t count = layout.c[rank];
+        if (count < 2) {
+            continue;
+        }
+        const double entropy =
+            conditional_entropy(layout, rank, static_cast<std::size_t>(count), cells, row_sums);
+        d_j[rank - 1] = entropy > 0.0 ? entropy / std::log(static_cast<double>(count)) : 0.0;
+    }
 
-double normalized_conditional_mutual_information(
-    const std::vector<LocalSpectralSignature>& signatures, std::size_t num_vertices, double tau,
-    std::uint32_t rank_i, std::uint32_t rank_j) {
-    if (rank_i == 0 || rank_j == 0) {
-        return 0.0;
+    std::map<std::uint64_t, double> nmi_cache;
+    const auto nmi_of = [&](std::uint32_t rank_a, std::uint32_t rank_b) {
+        const std::uint32_t lo = std::min(rank_a, rank_b);
+        const std::uint32_t hi = std::max(rank_a, rank_b);
+        const std::uint64_t key =
+            (static_cast<std::uint64_t>(lo) << 32) | static_cast<std::uint64_t>(hi);
+        const auto it = nmi_cache.find(key);
+        if (it != nmi_cache.end()) {
+            return it->second;
+        }
+        const double value = conditional_nmi(layout, lo, hi);
+        nmi_cache.emplace(key, value);
+        return value;
+    };
+
+    struct Candidate {
+        std::uint32_t rank;
+        double bound;
+    };
+    std::vector<Candidate> candidates;
+    candidates.reserve(layout.max_rank);
+    for (std::uint32_t rank = 1; rank <= layout.max_rank; ++rank) {
+        const std::uint64_t count = layout.c[rank];
+        if (count < 2 || d_j[rank - 1] <= 0.0) {
+            continue;
+        }
+        if (static_cast<double>(count) > options.budget_entries + 0.5) {
+            continue;
+        }
+        const double bound = static_cast<double>(count) /
+                             static_cast<double>(layout.num_vertices) * d_j[rank - 1];
+        candidates.push_back({rank, bound});
     }
-    RankLayout layout = build_layout(signatures, tau, std::max(rank_i, rank_j));
-    if (layout.num_vertices != num_vertices || layout.max_rank < std::max(rank_i, rank_j)) {
-        return 0.0;
+    std::sort(candidates.begin(), candidates.end(),
+              [&layout](const Candidate& a, const Candidate& b) {
+                  if (a.bound != b.bound) {
+                      return a.bound > b.bound;
+                  }
+                  const std::uint64_t ca = layout.c[a.rank];
+                  const std::uint64_t cb = layout.c[b.rank];
+                  if (ca != cb) {
+                      return ca > cb;
+                  }
+                  return a.rank < b.rank;
+              });
+
+    std::vector<bool> selected(static_cast<std::size_t>(layout.max_rank) + 1, false);
+    std::uint64_t space = 0;
+    while (true) {
+        std::uint32_t best_rank = 0;
+        double best_delta = 0.0;
+        for (const Candidate& candidate : candidates) {
+            if (selected[candidate.rank]) {
+                continue;
+            }
+            if (static_cast<double>(space) + static_cast<double>(layout.c[candidate.rank]) >
+                options.budget_entries + 0.5) {
+                continue;
+            }
+            if (best_rank != 0 && candidate.bound < best_delta - kTieEps) {
+                break;
+            }
+            double max_nmi = 0.0;
+            for (std::uint32_t chosen : result.selected_ranks) {
+                max_nmi = std::max(max_nmi, nmi_of(chosen, candidate.rank));
+            }
+            const double delta = candidate.bound * (1.0 - max_nmi);
+            if (delta > best_delta + kTieEps) {
+                best_delta = delta;
+                best_rank = candidate.rank;
+            }
+        }
+        if (best_rank == 0) {
+            break;
+        }
+        selected[best_rank] = true;
+        result.selected_ranks.push_back(best_rank);
+        space += layout.c[best_rank];
+        if (static_cast<double>(space) + 1.0 > options.budget_entries + 0.5) {
+            break;
+        }
     }
-    return conditional_nmi(layout, rank_i, rank_j);
+    std::sort(result.selected_ranks.begin(), result.selected_ranks.end());
+    result.space_entries = space;
+    return result;
 }
 }

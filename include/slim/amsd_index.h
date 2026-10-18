@@ -65,12 +65,8 @@ struct AmsdIndex {
     std::uint32_t configured_ranks = 0;
     std::uint32_t configured_bins = 0;
 
-    std::uint32_t rank_select_mode = 3;
-    double budget_ratio = 0.0;
-    double budget_entries = 0.0;
     std::uint64_t space_entries = 0;
     std::vector<std::uint32_t> selected_ranks;
-    std::vector<std::uint32_t> selection_order;
 
     std::uint64_t bitmap_bytes = 0;
     std::vector<AmsdGroup> groups;

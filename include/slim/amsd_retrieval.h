@@ -5,6 +5,7 @@
 #include <slim/spectral_dominance_index.h>
 #include <slim/types.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <utility>
@@ -13,34 +14,17 @@
 namespace slim {
 struct AmsdQueryPlan {
     std::uint32_t dimension = 0;
-
     std::vector<std::pair<std::uint32_t, double>> ranks;
-};
-
-struct AmsdRetrievalStats {
-    std::uint64_t dimension_bitmap_builds = 0;
-    std::uint64_t dimension_bitmap_hits = 0;
-    std::uint64_t rank_ands = 0;
-    std::uint64_t rank_ands_skipped = 0;
-    std::uint64_t ranks_unavailable = 0;
-    std::uint64_t direct_scans = 0;
-    std::uint64_t region = 0;
-    std::uint64_t enumerated = 0;
-    std::uint64_t chain_tests = 0;
-    std::uint64_t chain_rejections = 0;
-    std::uint64_t chain_enabled_scans = 0;
 };
 
 constexpr double kScanNsPerCandidate = 12.0;
 constexpr double kBitmapNsPerWord = 1.0;
-
 constexpr double kAmsdSetupNs = 300.0;
-
 constexpr double kChannelCorrelationPenalty = 4.0;
-
 constexpr std::size_t kChainSampleStride = 16;
-
 constexpr double kSurvivorExtractNs = 1.5;
+constexpr double kRankBitTestNs = 3.0;
+constexpr double kPreemptedCandidateNs = 12.0;
 
 inline double corrected_keep_fraction(double keep_fraction) {
     const double channel_keep = std::max(0.0, std::min(1.0, keep_fraction));
@@ -56,9 +40,6 @@ inline bool amsd_pays_off(std::size_t region, double keep_fraction, std::size_t 
                survivors * kSurvivorExtractNs;
 }
 
-constexpr double kRankBitTestNs = 3.0;
-constexpr double kPreemptedCandidateNs = 12.0;
-
 inline bool amsd_bit_test_pays_off(double keep_fraction, std::size_t rank_count) {
     if (rank_count == 0) {
         return false;
@@ -69,12 +50,11 @@ inline bool amsd_bit_test_pays_off(double keep_fraction, std::size_t rank_count)
 
 class AmsdRetriever {
 public:
-    const BitVector& dimension_bitmap(const SpectralDominanceIndex::LabelGroup& label_group, std::uint32_t dimension,
-                                      AmsdRetrievalStats* stats);
+    const BitVector& dimension_bitmap(const SpectralDominanceIndex::LabelGroup& label_group,
+                                      std::uint32_t dimension);
 
     void retrieve(const SpectralDominanceIndex::LabelGroup& label_group, const AmsdGroup& group,
-                  const AmsdQueryPlan& plan, bool adaptive, BitVector& result,
-                  AmsdRetrievalStats* stats);
+                  const AmsdQueryPlan& plan, BitVector& result);
 
 private:
     struct DimensionCacheEntry {

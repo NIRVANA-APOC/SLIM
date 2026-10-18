@@ -3,22 +3,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <utility>
 
 namespace slim {
 namespace {
-double adaptive_cheap_candidate_ns() {
-    static const double value = [] {
-        const char* text = std::getenv("SLIM_ADAPTIVE_CHEAP_NS");
-        if (text != nullptr) {
-            return std::strtod(text, nullptr);
-        }
-        return kScanNsPerCandidate;
-    }();
-    return value;
-}
-
 double expected_reduction(std::size_t current, std::size_t suffix_size,
                           std::size_t partition_size) {
     if (partition_size == 0) {
@@ -33,21 +21,12 @@ double expected_reduction(std::size_t current, std::size_t suffix_size,
 bool worthwhile(double reduction, std::size_t words) {
     return reduction * kScanNsPerCandidate > static_cast<double>(words) * kBitmapNsPerWord;
 }
-
-bool worthwhile_probe(double reduction, std::size_t words) {
-    return reduction * adaptive_cheap_candidate_ns() >
-           static_cast<double>(words) * kBitmapNsPerWord;
-}
 }
 
-const BitVector& AmsdRetriever::dimension_bitmap(const SpectralDominanceIndex::LabelGroup& label_group,
-                                                 std::uint32_t dimension,
-                                                 AmsdRetrievalStats* stats) {
+const BitVector& AmsdRetriever::dimension_bitmap(
+    const SpectralDominanceIndex::LabelGroup& label_group, std::uint32_t dimension) {
     for (const DimensionCacheEntry& entry : dimension_cache_) {
         if (entry.group == &label_group && entry.dimension == dimension) {
-            if (stats != nullptr) {
-                ++stats->dimension_bitmap_hits;
-            }
             return entry.bits;
         }
     }
@@ -65,23 +44,16 @@ const BitVector& AmsdRetriever::dimension_bitmap(const SpectralDominanceIndex::L
         slot.bits.set_range(static_cast<std::size_t>(bucket.begin),
                             static_cast<std::size_t>(bucket.begin + bucket.count));
     }
-    if (stats != nullptr) {
-        ++stats->dimension_bitmap_builds;
-    }
     return slot.bits;
 }
 
 void AmsdRetriever::retrieve(const SpectralDominanceIndex::LabelGroup& label_group,
-                             const AmsdGroup& group,
-                             const AmsdQueryPlan& plan, bool adaptive, BitVector& result,
-                             AmsdRetrievalStats* stats) {
+                             const AmsdGroup& group, const AmsdQueryPlan& plan,
+                             BitVector& result) {
     const std::size_t partition_size = label_group.vertices.size();
-    const BitVector& base = dimension_bitmap(label_group, plan.dimension, stats);
+    const BitVector& base = dimension_bitmap(label_group, plan.dimension);
     const std::size_t words = base.words();
     const std::size_t region = base.count();
-    if (stats != nullptr) {
-        stats->region += region;
-    }
 
     result.resize_bits(base.bits());
     result.clear();
@@ -90,10 +62,6 @@ void AmsdRetriever::retrieve(const SpectralDominanceIndex::LabelGroup& label_gro
     }
 
     if (!worthwhile(static_cast<double>(region), words)) {
-        if (stats != nullptr) {
-            ++stats->direct_scans;
-            stats->enumerated += region;
-        }
         return;
     }
 
@@ -102,56 +70,32 @@ void AmsdRetriever::retrieve(const SpectralDominanceIndex::LabelGroup& label_gro
     for (const std::pair<std::uint32_t, double>& entry : plan.ranks) {
         const AmsdRankIndex* rank = group.find_rank(entry.first);
         if (rank == nullptr) {
-            if (stats != nullptr) {
-                ++stats->ranks_unavailable;
-            }
             continue;
         }
         const int rung = rank->rung_for(entry.second);
         if (rung < 0) {
-            if (stats != nullptr) {
-                ++stats->ranks_unavailable;
-            }
             continue;
         }
         const std::size_t index = static_cast<std::size_t>(rung);
         channels_.push_back({&rank->suffix[index], rank->suffix_sets[index], entry.first});
     }
 
-    if (!adaptive) {
-        std::sort(channels_.begin(), channels_.end(),
-                  [](const Channel& a, const Channel& b) { return a.rank < b.rank; });
-    } else {
-        std::sort(channels_.begin(), channels_.end(),
-                  [](const Channel& a, const Channel& b) {
-                      return a.suffix_size < b.suffix_size;
-                  });
-    }
+    std::sort(channels_.begin(), channels_.end(),
+              [](const Channel& a, const Channel& b) {
+                  return a.suffix_size < b.suffix_size;
+              });
 
     std::size_t count = region;
     for (const Channel& channel : channels_) {
         if (count <= 1) {
             break;
         }
-        if (adaptive) {
-            const double reduction =
-                expected_reduction(count, channel.suffix_size, partition_size);
-            if (!worthwhile_probe(reduction, words)) {
-                if (stats != nullptr) {
-                    ++stats->rank_ands_skipped;
-                }
-                continue;
-            }
+        const double reduction = expected_reduction(count, channel.suffix_size, partition_size);
+        if (!worthwhile(reduction, words)) {
+            continue;
         }
         result.and_with(*channel.suffix);
         count = result.count();
-        if (stats != nullptr) {
-            ++stats->rank_ands;
-        }
-    }
-
-    if (stats != nullptr) {
-        stats->enumerated += count;
     }
 }
 }

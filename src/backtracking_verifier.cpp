@@ -64,10 +64,8 @@ void BacktrackingVerifier::propagate_edge_constraints(
         }
     };
 
-    const int max_rounds = [] {
-        const char* env = std::getenv("SLIM_PROP_ROUNDS");
-        return env == nullptr ? 3 : std::atoi(env);
-    }();
+    constexpr int kPropagationRounds = 3;
+    const int max_rounds = kPropagationRounds;
 
     for (int round = 0; round < max_rounds; ++round) {
         bool changed = false;
@@ -130,7 +128,7 @@ void BacktrackingVerifier::propagate_edge_constraints(
 }
 
 BacktrackingVerifier::Result BacktrackingVerifier::verify(const LabeledGraph& query_graph,
-                                  Candidates& candidates,
+                                  CandidateSets& candidates,
                                   std::size_t limit) {
     Result result;
     const std::size_t query_size = query_graph.num_vertices();

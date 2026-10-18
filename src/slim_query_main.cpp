@@ -17,6 +17,7 @@ struct Options {
     std::string query_list_path;
     std::string output_csv_path;
     std::size_t limit = 0;
+    slim::VerifierBackend backend = slim::VerifierBackend::Ive;
     bool metrics = false;
     bool filter_only = false;
     bool trace_dominance = false;
@@ -32,6 +33,7 @@ void print_usage(const char* program) {
         << "  -q, --query <file>          single query graph file\n"
         << "      --query-list <file>     one query path per line\n"
         << "  -l, --limit <N>             stop after N matches; 0 = enumerate all\n"
+        << "      --verifier <engine>     enumeration backend: ive (default), lftj or veq\n"
         << "      --output-csv <file>     write machine-readable metrics CSV\n"
         << "      --metrics               print metrics CSV to stdout\n"
         << "      --filter-only           stop after spectral filtering\n"
@@ -63,6 +65,18 @@ Options parse_options(int argc, char** argv) {
             options.query_list_path = next(arg.c_str());
         } else if (arg == "-l" || arg == "--limit") {
             options.limit = std::stoull(next(arg.c_str()));
+        } else if (arg == "--verifier") {
+            const std::string engine = next(arg.c_str());
+            if (engine == "ive") {
+                options.backend = slim::VerifierBackend::Ive;
+            } else if (engine == "lftj") {
+                options.backend = slim::VerifierBackend::Lftj;
+            } else if (engine == "veq") {
+                options.backend = slim::VerifierBackend::Veq;
+            } else {
+                throw std::runtime_error("invalid --verifier value: " + engine +
+                                         " (expected: ive, lftj, veq)");
+            }
         } else if (arg == "--output-csv") {
             options.output_csv_path = next(arg.c_str());
             options.metrics = true;
@@ -123,7 +137,8 @@ void write_metrics_header(std::ostream& out) {
     out << "query_path,end_to_end_us,match_core_us,index_load_us,data_load_us,query_load_us,"
         << "query_spectral_us,filter_us,verify_us,"
         << "verify_propagation_us,verify_adjacency_us,verify_enumeration_us,"
-        << "candidates_after_filter,candidates_after_propagation,match_count,early_stopped,"
+        << "label_degree_candidates,candidates_after_filter,candidates_after_propagation,"
+        << "match_count,early_stopped,"
         << "coarse_dominance_checks,full_dominance_checks,"
         << "data_vertices,query_vertices,query_edges\n";
 }
@@ -148,6 +163,7 @@ void write_metrics_row(std::ostream& out, const std::string& query_path,
         << ',' << stats.verify_propagation_us
         << ',' << stats.verify_adjacency_us
         << ',' << stats.verify_enumeration_us
+        << ',' << stats.label_degree_candidates
         << ',' << stats.candidates_after_filter
         << ',' << stats.candidates_after_propagation
         << ',' << stats.match_count
@@ -169,7 +185,7 @@ int main(int argc, char** argv) {
         slim::SlimMatcher matcher(options.index_path);
         const auto index_end = std::chrono::high_resolution_clock::now();
         const auto data_start = std::chrono::high_resolution_clock::now();
-        matcher.set_data_graph(slim::read_graph(options.data_path));
+        matcher.set_data_graph(slim::read_graph(options.data_path), options.backend);
         const auto data_end = std::chrono::high_resolution_clock::now();
         const auto index_load_us = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::microseconds>(index_end - index_start).count());

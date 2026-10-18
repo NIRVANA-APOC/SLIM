@@ -14,8 +14,6 @@
 #include <vector>
 
 namespace slim {
-constexpr std::uint32_t INDEX_FORMAT_VERSION = 2;
-
 class SpectralDominanceIndex {
 public:
     struct DominanceKey {
@@ -50,22 +48,8 @@ public:
     std::uint32_t num_labels() const { return num_labels_; }
     const std::vector<Label>& alphabet() const { return alphabet_; }
 
-    struct Identity {
-        std::uint32_t format_version = 0;
-        std::uint64_t data_fingerprint = 0;
-        std::uint64_t label_fingerprint = 0;
-        std::uint64_t neighborhood_size_limit = 0;
-        double tau_scale = 0.0;
-        std::uint64_t data_vertices = 0;
-        std::uint64_t data_edges = 0;
-    };
-
-    bool has_identity() const { return has_identity_; }
-    const Identity& identity() const { return identity_; }
-
     double alpha() const { return alpha_; }
     int k() const { return k_; }
-
     double tau() const { return tau_; }
 
     std::size_t num_vertices() const { return signatures_.size(); }
@@ -86,16 +70,12 @@ public:
     void save(const std::string& path) const;
     static std::unique_ptr<SpectralDominanceIndex> load(const std::string& path);
 
-    void rebuild_amsd(const SlimConfig& config);
-
 private:
     SpectralDominanceIndex() = default;
 
     double alpha_ = 1.0;
     int k_ = 1;
     double tau_ = 0.0;
-    bool has_identity_ = false;
-    Identity identity_;
     std::vector<LocalSpectralSignature> signatures_;
     std::vector<LabelGroup> groups_;
     std::vector<EmptyGroup> empty_groups_;
@@ -111,12 +91,6 @@ private:
 
 class OfflineIndexBuilder {
 public:
-    struct BuildTimings {
-        std::uint64_t preprocess_ms = 0;
-        std::uint64_t assemble_ms = 0;
-        std::uint64_t amsd_ms = 0;
-    };
-
     explicit OfflineIndexBuilder(const LabeledGraph& graph, SlimConfig config);
 
     std::unique_ptr<SpectralDominanceIndex> build();
@@ -125,14 +99,11 @@ public:
 
     std::size_t label_skipped_vertices() const { return label_skipped_vertices_; }
 
-    const BuildTimings& timings() const { return timings_; }
-
 private:
     const LabeledGraph& graph_;
     SlimConfig config_;
     std::size_t skipped_vertices_ = 0;
     std::size_t label_skipped_vertices_ = 0;
-    BuildTimings timings_;
 };
 }
 

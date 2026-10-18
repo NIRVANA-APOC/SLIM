@@ -52,9 +52,10 @@ For every query vertex the online stage picks the mechanism its cost model
 expects to pay for: the threshold bitmaps, a per-candidate rank test inside the
 partition scan, or the plain partition scan.
 
-Index files carry format version 2 and a separately versioned multi-rank
-section; a file without that section is refused at load time (`the index has no
-multi-rank index section`), so rebuild it with this `slim_index`.
+Index files carry a separately versioned multi-rank section that records the
+selected ranks, the entries they occupy and each partition's degrees. A file
+without that section is refused at load time (`the index has no multi-rank
+index section`), so rebuild it with this `slim_index`.
 
 ## Contents
 
@@ -142,6 +143,10 @@ find queries/yeast/s8 -name '*.query' | sort > queries.txt
 ./build/slim_query -i yeast.index -d datasets/real/yeast.graph \
     --query-list queries.txt --output-csv metrics.csv
 
+# Online: pick the enumeration backend (ive default, lftj, veq)
+./build/slim_query -i yeast.index -d datasets/real/yeast.graph \
+    -q queries/yeast/s8/yeast_s8_sparse_00.query --verifier lftj -l 10
+
 # Online: stop after the first match (full enumeration of s64 dense is slow)
 ./build/slim_query -i yeast.index -d datasets/real/yeast.graph \
     -q queries/yeast/s64/yeast_s64_dense_00.query \
@@ -176,6 +181,7 @@ interest. Other datasets work the same way: replace `-d` with
 | `filter_us` | spectral filtering and candidate propagation (`Tfilter`) |
 | `verify_us` | exact enumeration (`Tenum`) |
 | `verify_propagation_us`, `verify_adjacency_us`, `verify_enumeration_us` | the three stages of `verify_us` |
+| `label_degree_candidates` | `Σ_u \|C_0(u)\|`, the label- and degree-compatible baseline the pruning rate is measured against |
 | `candidates_after_filter` | `Σ_u \|C(u)\|` after filtering |
 | `candidates_after_propagation` | `Σ_u \|C(u)\|` after propagation |
 | `match_count` | embeddings found (capped by `--limit`) |
@@ -208,6 +214,7 @@ interest. Other datasets work the same way: replace `-d` with
 | `-q, --query` | single query file (exactly one of `-q` / `--query-list`) |
 | `--query-list` | file with one query path per line (exactly one of `-q` / `--query-list`) |
 | `-l, --limit` | stop after N matches; `0` = enumerate all (default `0`) |
+| `--verifier` | enumeration backend: `ive` (default), `lftj` or `veq` |
 | `--output-csv` | write a machine-readable metrics CSV |
 | `--metrics` | print the metrics CSV to stdout |
 | `--filter-only` | stop after spectral filtering (for measurement) |
@@ -221,10 +228,9 @@ written with any N is bit-identical to the single-threaded one.
 
 ## Third-party code
 
-`src/verify_engine/` holds the enumeration engines of the online stage. The
-command-line interface drives the default one (IVE); the other two are
-library-level alternatives (`slim::VerifierBackend`) that the experiments used
-for cross-checking.
+`src/verify_engine/` holds the three enumeration engines of the online stage:
+IVE, LFTJ and VEQ, selected with `--verifier`. All three implement the same
+exact enumeration and only differ in their search machinery.
 
 | Engine | Directory | Provenance |
 |---|---|---|

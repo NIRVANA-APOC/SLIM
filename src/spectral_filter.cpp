@@ -1,7 +1,5 @@
 #include <slim/spectral_filter.h>
 
-#include <chrono>
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -136,23 +134,8 @@ void SpectralFilter::filter_into(
 
     coarse_dominance_checks_ = 0;
     full_dominance_checks_ = 0;
-    scanned_buckets_ = 0;
-    scanned_cells_ = 0;
-    ld_candidates_ = 0;
-    label_rejects_ = 0;
-    dim_rejects_ = 0;
-    key_rejects_ = 0;
-    win_rejects_ = 0;
-    empty_accepts_ = 0;
-    amsd_stats_ = AmsdRetrievalStats();
-    amsd_active_vertices_ = 0;
-    amsd_bucket_vertices_ = 0;
-    amsd_bit_test_vertices_ = 0;
-    amsd_bitmap_vertices_ = 0;
-    dispatch_ns_ = 0;
 
-    const bool label_filter = label_filter_enabled_ && index_.has_ball_labels();
-    const bool spectral_test = spectral_test_enabled_;
+    const bool label_filter = index_.has_ball_labels();
     query_ball_labels_.clear();
     query_ball_begin_.assign(query_size + 1, 0);
     if (label_filter) {
@@ -160,7 +143,7 @@ void SpectralFilter::filter_into(
         KHopNeighborhood neighborhood(query_graph);
         std::vector<std::uint32_t> ids;
         for (VertexId u = 0; u < query_size; ++u) {
-            const std::vector<VertexId>& ball = neighborhood.extract(u, query_radius());
+            const std::vector<VertexId>& ball = neighborhood.extract(u, index_.k());
             ids.clear();
             ids.reserve(ball.size());
             for (VertexId w : ball) {
@@ -204,12 +187,6 @@ void SpectralFilter::filter_into(
         const QueryLabelCount* query_labels_end =
             label_filter ? query_ball_labels_.data() + query_ball_begin_[u + 1] : nullptr;
 
-        if (channel_stats_ && spectral_test) {
-            classify_into(query_graph, query_sig, u, query_labels, query_labels_end, accepted);
-            sort_vertex_ids(accepted, radix_scratch_, max_id);
-            continue;
-        }
-
         if (const SpectralDominanceIndex::EmptyGroup* empty =
                 index_.find_empty_group(query_label)) {
             for (VertexId v : empty->vertices) {
@@ -224,7 +201,7 @@ void SpectralFilter::filter_into(
             }
         }
 
-        if (spectral_test && (query_dim == 0 || tau <= 0.0)) {
+        if (query_dim == 0 || tau <= 0.0) {
             continue;
         }
 
@@ -240,58 +217,23 @@ void SpectralFilter::filter_into(
         const AmsdGroup* candidate_group = index_.amsd_group_at(position);
         if (candidate_group != nullptr && candidate_group->size == group->vertices.size()) {
             amsd_group = candidate_group;
-            if (spectral_test) {
-                if (amsd_provider_adaptive_) {
-                    provider = choose_provider(*group, *candidate_group, query_sig,
-                                               &region_hint);
-                } else {
-                    collect_rank_channels(*candidate_group, query_sig);
-                    provider = amsd_channels_.empty() ? Provider::BucketScan : Provider::Bitmap;
-                    region_hint = 0;
-                }
-            }
+            provider = choose_provider(*group, *candidate_group, query_sig, &region_hint);
         }
         if (provider != Provider::BitTest) {
             amsd_channels_.clear();
         } else if (amsd_channels_.size() > 1) {
-            if (amsd_adaptive_) {
-                std::sort(amsd_channels_.begin(), amsd_channels_.end(),
-                          [](const RankChannel& a, const RankChannel& b) {
-                              return a.suffix_size < b.suffix_size;
-                          });
-            } else {
-                std::sort(amsd_channels_.begin(), amsd_channels_.end(),
-                          [](const RankChannel& a, const RankChannel& b) {
-                              return a.rank < b.rank;
-                          });
-            }
+            std::sort(amsd_channels_.begin(), amsd_channels_.end(),
+                      [](const RankChannel& a, const RankChannel& b) {
+                          return a.suffix_size < b.suffix_size;
+                      });
         }
 
-        if (amsd_group != nullptr) {
-            ++amsd_active_vertices_;
-            if (provider == Provider::Bitmap) {
-                ++amsd_bitmap_vertices_;
-            } else if (provider == Provider::BitTest) {
-                ++amsd_bit_test_vertices_;
-            } else {
-                ++amsd_bucket_vertices_;
-            }
-        }
-
-        const auto dispatch_start =
-            stage_timings_ ? std::chrono::steady_clock::now()
-                           : std::chrono::steady_clock::time_point();
         if (provider == Provider::Bitmap) {
             retrieve_amsd_into(*group, *amsd_group, query_sig, query_degree,
                                query_lambda_max, query_labels, query_labels_end, accepted);
         } else {
             scan_buckets_into(*group, query_sig, query_degree, query_lambda_max, query_labels,
                               query_labels_end, region_hint, accepted);
-        }
-        if (stage_timings_) {
-            const auto dispatch_end = std::chrono::steady_clock::now();
-            dispatch_ns_ += static_cast<std::uint64_t>(std::chrono::duration_cast<
-                std::chrono::nanoseconds>(dispatch_end - dispatch_start).count());
         }
 
         sort_vertex_ids(accepted, radix_scratch_, max_id);
@@ -385,25 +327,7 @@ void SpectralFilter::retrieve_amsd_into(
     const QueryLabelCount* query_labels_end, std::vector<VertexId>& accepted) const {
     const std::size_t group_size = group.vertices.size();
     const std::size_t query_dim = query_sig.dimension();
-    const bool spectral_test = spectral_test_enabled_;
     const bool label_filter = query_labels != nullptr;
-    ++amsd_active_vertices_;
-
-    if (!spectral_test) {
-        accepted.reserve(accepted.size() + group_size);
-        for (std::size_t i = 0; i < group_size; ++i) {
-            const VertexId v = group.vertices[i];
-            if (data_graph_.degree(v) < query_degree) {
-                continue;
-            }
-            if (label_filter &&
-                !label_covered(index_.ball_counts(v), query_labels, query_labels_end)) {
-                continue;
-            }
-            accepted.push_back(v);
-        }
-        return;
-    }
 
     amsd_plan_.dimension = static_cast<std::uint32_t>(query_dim);
     amsd_plan_.ranks.clear();
@@ -416,8 +340,7 @@ void SpectralFilter::retrieve_amsd_into(
         amsd_plan_.ranks.emplace_back(rank.rank, threshold);
     }
 
-    amsd_retriever_.retrieve(group, amsd_group, amsd_plan_, amsd_adaptive_, amsd_result_,
-                             &amsd_stats_);
+    amsd_retriever_.retrieve(group, amsd_group, amsd_plan_, amsd_result_);
 
     amsd_survivors_.clear();
     const std::size_t survivor_count = amsd_result_.count();
@@ -474,11 +397,10 @@ void SpectralFilter::scan_buckets_into(
     std::vector<VertexId>& accepted) const {
     const std::vector<RankChannel>& rank_channels = amsd_channels_;
     const bool label_filter = query_labels != nullptr;
-    const bool spectral_test = spectral_test_enabled_;
     const std::size_t query_dim = query_sig.dimension();
     const double tau = index_.tau();
     const bool has_ball_labels = label_filter;
-    const bool chain_available = !rank_channels.empty() && spectral_test;
+    const bool chain_available = !rank_channels.empty();
     bool chain_enabled = false;
     const double chain_cost_ns =
         static_cast<double>(rank_channels.size()) * kRankBitTestNs;
@@ -493,13 +415,11 @@ void SpectralFilter::scan_buckets_into(
     const std::uint32_t query_dimension = static_cast<std::uint32_t>(query_dim);
 
     auto bucket_it =
-        spectral_test
-            ? std::lower_bound(
-                  group.buckets.begin(), group.buckets.end(), query_layer,
-                  [](const SpectralDominanceIndex::Bucket& bucket, std::uint32_t layer) {
-                      return bucket.layer < layer;
-                  })
-            : group.buckets.begin();
+        std::lower_bound(
+            group.buckets.begin(), group.buckets.end(), query_layer,
+            [](const SpectralDominanceIndex::Bucket& bucket, std::uint32_t layer) {
+                return bucket.layer < layer;
+            });
 
     std::size_t capacity = accepted.size() + region_hint;
     if (region_hint == 0) {
@@ -511,14 +431,9 @@ void SpectralFilter::scan_buckets_into(
     }
     accepted.reserve(capacity);
 
-    if (chain_enabled) {
-        ++amsd_stats_.chain_enabled_scans;
-    }
     for (; bucket_it != group.buckets.end(); ++bucket_it) {
         const SpectralDominanceIndex::Bucket& bucket = *bucket_it;
-        ++scanned_buckets_;
-        scanned_cells_ += bucket.count;
-        if (spectral_test && bucket.dimension < query_dimension) {
+        if (bucket.dimension < query_dimension) {
             continue;
         }
         const VertexId* cells = group.vertices.data() + bucket.begin;
@@ -556,14 +471,12 @@ void SpectralFilter::scan_buckets_into(
                         }
                     }
                     ++chain_sampled;
-                    ++amsd_stats_.chain_tests;
                     if (!passed) {
                         ++chain_rejected;
                     }
                     chain_enabled = chain_rejected * kPreemptedCandidateNs >
                                     chain_cost_ns * static_cast<double>(chain_sampled);
                     if (!passed) {
-                        ++amsd_stats_.chain_rejections;
                         continue;
                     }
                 }
@@ -571,15 +484,9 @@ void SpectralFilter::scan_buckets_into(
             if (data_graph_.degree(v) < query_degree) {
                 continue;
             }
-            if (spectral_test) {
-                ++coarse_dominance_checks_;
-            }
+            ++coarse_dominance_checks_;
             if (label_filter &&
                 !label_covered(index_.ball_counts(v), query_labels, query_labels_end)) {
-                continue;
-            }
-            if (!spectral_test) {
-                accepted.push_back(v);
                 continue;
             }
             const LocalSpectralSignature& data_sig = index_.signature(v);
@@ -619,94 +526,11 @@ std::size_t SpectralFilter::count_label_degree_candidates(
     return total;
 }
 
-void SpectralFilter::classify_into(const LabeledGraph& query_graph,
-                                   const LocalSpectralSignature& query_sig,
-                                   VertexId u,
-                                   const QueryLabelCount* query_labels,
-                                   const QueryLabelCount* query_labels_end,
-                                   std::vector<VertexId>& accepted) const {
-    const bool label_filter = query_labels != nullptr;
-    const Label query_label = query_graph.label(u);
-    const std::size_t query_degree = query_graph.degree(u);
-    const std::size_t query_dim = query_sig.dimension();
-    const double query_lambda_max = query_sig.lambda_max();
-    const double tau = index_.tau();
-
-    if (const SpectralDominanceIndex::EmptyGroup* empty = index_.find_empty_group(query_label)) {
-        for (VertexId v : empty->vertices) {
-            if (data_graph_.degree(v) < query_degree) {
-                continue;
-            }
-            ++ld_candidates_;
-            if (label_filter &&
-                !label_covered(index_.ball_counts(v), query_labels, query_labels_end)) {
-                ++label_rejects_;
-                continue;
-            }
-            accepted.push_back(v);
-            ++empty_accepts_;
-        }
-    }
-
-    if (query_dim == 0 || tau <= 0.0) {
-        return;
-    }
-    const SpectralDominanceIndex::LabelGroup* group = index_.find_group(query_label);
-    if (group == nullptr) {
-        return;
-    }
-
-    const std::uint32_t query_dimension = static_cast<std::uint32_t>(query_dim);
-    const std::uint32_t query_layer = static_cast<std::uint32_t>(std::floor(
-        std::max(0.0, query_lambda_max - DOMINANCE_EPSILON) / tau));
-
-    for (const SpectralDominanceIndex::Bucket& bucket : group->buckets) {
-        const bool reachable = bucket.layer >= query_layer;
-        if (reachable) {
-            ++scanned_buckets_;
-            scanned_cells_ += bucket.count;
-        }
-        const VertexId* cells = group->vertices.data() + bucket.begin;
-        for (std::uint64_t pos = 0; pos < bucket.count; ++pos) {
-            const VertexId v = cells[pos];
-            if (data_graph_.degree(v) < query_degree) {
-                continue;
-            }
-            ++ld_candidates_;
-            if (bucket.dimension < query_dimension) {
-                ++dim_rejects_;
-                continue;
-            }
-            if (reachable) {
-                ++coarse_dominance_checks_;
-            }
-            if (label_filter &&
-                !label_covered(index_.ball_counts(v), query_labels, query_labels_end)) {
-                ++label_rejects_;
-                continue;
-            }
-            const LocalSpectralSignature& data_sig = index_.signature(v);
-            if (data_sig.lambda_max() + DOMINANCE_EPSILON < query_lambda_max) {
-                ++key_rejects_;
-                continue;
-            }
-            if (reachable) {
-                ++full_dominance_checks_;
-            }
-            if (data_sig.dominates(query_sig)) {
-                accepted.push_back(v);
-            } else {
-                ++win_rejects_;
-            }
-        }
-    }
-}
-
 LocalSpectralSignature SpectralFilter::compute_query_signature(
     const LabeledGraph& query_graph,
     VertexId u,
     KHopNeighborhood& neighborhood) const {
     const LabelSpectralOperator op(index_.alpha(), encoder_);
-    return compute_local_spectral_signature(query_graph, op, query_radius(), u, neighborhood);
+    return compute_local_spectral_signature(query_graph, op, index_.k(), u, neighborhood);
 }
 }
