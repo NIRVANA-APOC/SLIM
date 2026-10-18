@@ -86,6 +86,8 @@ public:
     void save(const std::string& path) const;
     static std::unique_ptr<SpectralDominanceIndex> load(const std::string& path);
 
+    void rebuild_amsd(const SlimConfig& config);
+
 private:
     SpectralDominanceIndex() = default;
 

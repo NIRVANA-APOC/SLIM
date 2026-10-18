@@ -241,11 +241,30 @@ void SpectralFilter::filter_into(
         if (candidate_group != nullptr && candidate_group->size == group->vertices.size()) {
             amsd_group = candidate_group;
             if (spectral_test) {
-                provider = choose_provider(*group, *candidate_group, query_sig, &region_hint);
+                if (amsd_provider_adaptive_) {
+                    provider = choose_provider(*group, *candidate_group, query_sig,
+                                               &region_hint);
+                } else {
+                    collect_rank_channels(*candidate_group, query_sig);
+                    provider = amsd_channels_.empty() ? Provider::BucketScan : Provider::Bitmap;
+                    region_hint = 0;
+                }
             }
         }
         if (provider != Provider::BitTest) {
             amsd_channels_.clear();
+        } else if (amsd_channels_.size() > 1) {
+            if (amsd_adaptive_) {
+                std::sort(amsd_channels_.begin(), amsd_channels_.end(),
+                          [](const RankChannel& a, const RankChannel& b) {
+                              return a.suffix_size < b.suffix_size;
+                          });
+            } else {
+                std::sort(amsd_channels_.begin(), amsd_channels_.end(),
+                          [](const RankChannel& a, const RankChannel& b) {
+                              return a.rank < b.rank;
+                          });
+            }
         }
 
         if (amsd_group != nullptr) {

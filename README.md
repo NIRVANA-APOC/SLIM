@@ -19,32 +19,42 @@ Artifacts: `build/slim_index` (offline) and `build/slim_query` (online);
 
 `slim_index` writes one index file per data graph: the local spectral
 signatures, the label histograms, the `(label, layer, dimension)` partitions and
-the adaptive multi-rank (AMSD) retrieval section the online stage runs on.
+the multi-rank (AMSD) retrieval section the online stage runs on.
 
-That section indexes, per label partition, the threshold families of the top
-spectral coordinates of each signature: for rank `j` the family is a ladder of
+The retrieval section indexes, per label partition, the threshold families of a
+data-adaptive set of spectral ranks: for rank `j` the family is a ladder of
 decreasing thresholds, and rung `b` labels the vertices whose `j`-th largest
 stored eigenvalue is at least that threshold. A query threshold that falls
 between two rungs uses the next rung down, which can only keep extra vertices
-that the exact test then removes. The `j`-th coordinate inequality is a
+that the exact test then removes; the `j`-th coordinate inequality is a
 necessary condition of spectral dominance for every `j`, so a query vertex can
-intersect any subset of the ranks, in any order, and stop at any time; the exact
-dominance test decides the final candidate set, which therefore does not depend
-on how much of the retrieval ran before it. Besides the rank families the
-section carries each partition's degrees (a contiguous read instead of one
-random access into the data graph) and the dimension condition
-`|sigma(v)| >= |sigma(u)|`, materialized from the partition metadata on demand
-and therefore free in storage.
+intersect any subset of the ranks, in any order, and stop at any time. The exact
+dominance test decides the final candidate set, so it does not depend on how
+much of the retrieval ran before it. Besides the rank families the section
+carries each partition's degrees (a contiguous read instead of one random access
+into the data graph) and the dimension condition `|sigma(v)| >= |sigma(u)|`,
+materialized from the partition metadata on demand and therefore free in
+storage.
+
+The indexed rank set is selected offline from the data-side signatures alone,
+under an index-space budget of 4 |V_G| entries (one entry per eligible vertex
+and selected rank): starting from an empty set, the builder adds the rank with
+the largest marginal utility `D_j (1 - max_{i in R} NMI_ij)`, where `D_j` is the
+normalized conditional entropy of the rank's discretized value given the
+signature-length stratum and `NMI_ij` the normalized conditional mutual
+information of two ranks, and stops when no remaining rank fits or every
+feasible rank has zero marginal utility. Up to 32 candidate ranks and 32 rungs
+per rank are considered; the selected set is stored in the index, so the online
+stage never re-selects. `slim_index --verbose` prints the cap, the number of
+selected ranks, the entries they occupy and the bitmap bytes.
 
 For every query vertex the online stage picks the mechanism its cost model
 expects to pay for: the threshold bitmaps, a per-candidate rank test inside the
-partition scan, or the plain partition scan. The index is built with up to 6
-ranks and up to 32 rungs per rank; `slim_index --verbose` prints the ranks, the
-rungs and the bitmap bytes it produced.
+partition scan, or the plain partition scan.
 
-Index files carry format version 2. A file written by an older build has no
-multi-rank section and is refused at load time (`the index has no multi-rank
-index section`): rebuild it with this `slim_index`.
+Index files carry format version 2 and a separately versioned multi-rank
+section; a file without that section is refused at load time (`the index has no
+multi-rank index section`), so rebuild it with this `slim_index`.
 
 ## Contents
 

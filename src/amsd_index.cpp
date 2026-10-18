@@ -143,11 +143,11 @@ const AmsdGroup* AmsdIndex::find(Label label) const {
 AmsdIndex build_amsd_index(const std::vector<AmsdBuildGroup>& groups,
                            const std::vector<LocalSpectralSignature>& signatures,
                            const std::vector<std::uint32_t>& degrees,
-                           std::uint32_t max_ranks, std::uint32_t max_bins) {
+                           const std::vector<std::uint32_t>& ranks, std::uint32_t max_bins) {
     AmsdIndex amsd;
     amsd.present = true;
-    amsd.configured_ranks = max_ranks;
     amsd.configured_bins = max_bins;
+    amsd.selected_ranks = ranks;
     amsd.groups.resize(groups.size());
     amsd.degrees = degrees;
 
@@ -172,8 +172,7 @@ AmsdIndex build_amsd_index(const std::vector<AmsdBuildGroup>& groups,
             continue;
         }
 
-        const std::uint32_t ranks_to_build = std::min(max_ranks, max_dimension);
-        for (std::uint32_t rank = 1; rank <= ranks_to_build; ++rank) {
+        for (std::uint32_t rank : ranks) {
             sorted_local.clear();
             sorted_value.clear();
             std::uint32_t present = 0;

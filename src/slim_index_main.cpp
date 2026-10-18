@@ -95,7 +95,9 @@ int main(int argc, char** argv) {
                       << " vertices\n";
             std::cout << "tau: " << index->tau() << "\n";
             std::cout << "multi-rank index: ranks<=" << index->amsd().configured_ranks
+                      << " selected=" << index->amsd().selected_ranks.size()
                       << " bins<=" << index->amsd().configured_bins
+                      << " entries=" << index->amsd().space_entries
                       << " bitmap-bytes: " << index->amsd().bitmap_bytes << "\n";
             if (options.config.neighborhood_size_limit > 0) {
                 std::cout << "neighborhood-size-limit: "

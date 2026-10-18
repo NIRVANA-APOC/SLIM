@@ -3,10 +3,22 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <utility>
 
 namespace slim {
 namespace {
+double adaptive_cheap_candidate_ns() {
+    static const double value = [] {
+        const char* text = std::getenv("SLIM_ADAPTIVE_CHEAP_NS");
+        if (text != nullptr) {
+            return std::strtod(text, nullptr);
+        }
+        return kScanNsPerCandidate;
+    }();
+    return value;
+}
+
 double expected_reduction(std::size_t current, std::size_t suffix_size,
                           std::size_t partition_size) {
     if (partition_size == 0) {
@@ -20,6 +32,11 @@ double expected_reduction(std::size_t current, std::size_t suffix_size,
 
 bool worthwhile(double reduction, std::size_t words) {
     return reduction * kScanNsPerCandidate > static_cast<double>(words) * kBitmapNsPerWord;
+}
+
+bool worthwhile_probe(double reduction, std::size_t words) {
+    return reduction * adaptive_cheap_candidate_ns() >
+           static_cast<double>(words) * kBitmapNsPerWord;
 }
 }
 
@@ -119,7 +136,7 @@ void AmsdRetriever::retrieve(const SpectralDominanceIndex::LabelGroup& label_gro
         if (adaptive) {
             const double reduction =
                 expected_reduction(count, channel.suffix_size, partition_size);
-            if (!worthwhile(reduction, words)) {
+            if (!worthwhile_probe(reduction, words)) {
                 if (stats != nullptr) {
                     ++stats->rank_ands_skipped;
                 }

@@ -64,6 +64,14 @@ struct AmsdIndex {
     bool present = false;
     std::uint32_t configured_ranks = 0;
     std::uint32_t configured_bins = 0;
+
+    std::uint32_t rank_select_mode = 3;
+    double budget_ratio = 0.0;
+    double budget_entries = 0.0;
+    std::uint64_t space_entries = 0;
+    std::vector<std::uint32_t> selected_ranks;
+    std::vector<std::uint32_t> selection_order;
+
     std::uint64_t bitmap_bytes = 0;
     std::vector<AmsdGroup> groups;
 
@@ -81,7 +89,7 @@ struct AmsdBuildGroup {
 AmsdIndex build_amsd_index(const std::vector<AmsdBuildGroup>& groups,
                            const std::vector<LocalSpectralSignature>& signatures,
                            const std::vector<std::uint32_t>& degrees,
-                           std::uint32_t max_ranks, std::uint32_t max_bins);
+                           const std::vector<std::uint32_t>& ranks, std::uint32_t max_bins);
 }
 
 #endif

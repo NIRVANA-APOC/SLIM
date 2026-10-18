@@ -1,4 +1,6 @@
 #include <slim/spectral_dominance_index.h>
+
+#include <slim/rank_selection.h>
 #include <slim/graph_fingerprint.h>
 #include <slim/spectral_operator.h>
 
@@ -8,6 +10,7 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iterator>
 #include <stdexcept>
 #include <string>
@@ -28,7 +31,95 @@ constexpr std::size_t IO_BUFFER = 1u << 20;
 constexpr char INDEX_IDENTITY_MAGIC[8] = {'S', 'L', 'I', 'M', 'I', 'D', 'X', '1'};
 
 constexpr char INDEX_AMSD_MAGIC[8] = {'S', 'L', 'I', 'M', 'A', 'M', 'S', 'D'};
-constexpr std::uint32_t AMSD_SECTION_VERSION = 1;
+
+void write_rank_signals_dump(const std::string& path, double tau, std::uint32_t max_rank,
+                             const std::vector<LocalSpectralSignature>& signatures) {
+    std::ofstream dump(path);
+    if (!dump) {
+        throw std::runtime_error("cannot open rank-signals dump '" + path + "'");
+    }
+    double max_lambda = 0.0;
+    for (const LocalSpectralSignature& signature : signatures) {
+        if (signature.dimension() > 0) {
+            max_lambda = std::max(max_lambda, stored_spectral_value(signature.lambda_max()));
+        }
+    }
+    std::uint32_t cols = 1;
+    if (tau > 0.0 && max_lambda > 0.0) {
+        constexpr double kMaxCols = 1u << 21;
+        cols = static_cast<std::uint32_t>(std::min(std::floor(max_lambda / tau) + 1.0, kMaxCols));
+        cols = std::max<std::uint32_t>(cols, 1);
+    }
+    dump << "# tau " << std::setprecision(17) << tau << " num_vertices " << signatures.size()
+         << " max_rank " << max_rank << " max_lambda " << std::setprecision(17) << max_lambda
+         << " cols " << cols << "\n";
+    for (std::size_t v = 0; v < signatures.size(); ++v) {
+        const std::uint32_t dim = static_cast<std::uint32_t>(signatures[v].dimension());
+        dump << v << ' ' << dim;
+        for (std::uint32_t rank = 1; rank <= max_rank; ++rank) {
+            const double value =
+                rank <= dim ? stored_spectral_value(signatures[v].eigenvalues[dim - rank]) : 0.0;
+            dump << ' ' << std::setprecision(17) << value;
+        }
+        dump << '\n';
+    }
+}
+
+void write_rank_report(const std::string& path, const RankSelectionResult& selection) {
+    std::ofstream report(path);
+    if (!report) {
+        throw std::runtime_error("cannot open rank report '" + path + "'");
+    }
+    report << "mode " << rank_select_mode_name(selection.mode) << '\n';
+    report << "tau " << std::setprecision(17) << selection.tau << '\n';
+    report << "num_vertices " << selection.num_vertices << '\n';
+    report << "budget " << std::setprecision(17) << selection.budget_entries << '\n';
+    report << "max_rank " << selection.max_rank << '\n';
+    report << "space " << selection.space_entries << '\n';
+    const auto at64 = [&selection](const std::vector<std::uint64_t>& values, std::uint32_t rank) {
+        return rank - 1 < values.size() ? values[rank - 1] : 0;
+    };
+    const auto atd = [&selection](const std::vector<double>& values, std::uint32_t rank) {
+        return rank - 1 < values.size() ? values[rank - 1] : 0.0;
+    };
+    for (std::uint32_t rank = 1; rank <= selection.max_rank; ++rank) {
+        report << "rank " << rank << ' ' << at64(selection.c_j, rank) << ' '
+               << std::setprecision(17) << atd(selection.h_j, rank) << ' '
+               << atd(selection.d_j, rank) << '\n';
+    }
+    report << "selected";
+    for (std::uint32_t rank : selection.selected_ranks) {
+        report << ' ' << rank;
+    }
+    report << '\n';
+    report << "order";
+    for (std::uint32_t rank : selection.selection_order) {
+        report << ' ' << rank;
+    }
+    report << '\n';
+    for (const RankNmiRecord& record : selection.nmi_calls) {
+        report << "nmi " << record.rank_a << ' ' << record.rank_b << ' '
+               << std::setprecision(17) << record.value << '\n';
+    }
+}
+
+RankSelectionOptions make_rank_selection_options(const SlimConfig& config, double tau,
+                                                 std::size_t num_vertices,
+                                                 std::uint32_t max_signature_dim) {
+    RankSelectionOptions options;
+    options.mode = config.amsd_rank_select;
+    options.tau = tau;
+    options.num_vertices = num_vertices;
+    options.budget_entries = config.amsd_budget_ratio * static_cast<double>(num_vertices);
+    options.max_rank = std::min(static_cast<std::uint32_t>(std::max(0, config.amsd_ranks)),
+                                max_signature_dim);
+    for (std::uint32_t rank = 1; rank <= options.max_rank; ++rank) {
+        options.fallback_ranks.push_back(rank);
+    }
+    return options;
+}
+
+constexpr std::uint32_t AMSD_SECTION_VERSION = 2;
 
 class BinaryWriter {
 public:
@@ -277,6 +368,18 @@ void SpectralDominanceIndex::save(const std::string& path) const {
         out.pod(AMSD_SECTION_VERSION);
         out.pod(amsd_.configured_ranks);
         out.pod(amsd_.configured_bins);
+        out.pod(amsd_.rank_select_mode);
+        out.pod(amsd_.budget_ratio);
+        out.pod(amsd_.budget_entries);
+        out.pod(amsd_.space_entries);
+        out.pod(static_cast<std::uint32_t>(amsd_.selected_ranks.size()));
+        for (std::uint32_t rank : amsd_.selected_ranks) {
+            out.pod(rank);
+        }
+        out.pod(static_cast<std::uint32_t>(amsd_.selection_order.size()));
+        for (std::uint32_t rank : amsd_.selection_order) {
+            out.pod(rank);
+        }
         out.pod(static_cast<std::uint32_t>(amsd_.degrees.size()));
         out.bytes(reinterpret_cast<const char*>(amsd_.degrees.data()),
                   amsd_.degrees.size() * sizeof(std::uint32_t));
@@ -403,12 +506,28 @@ std::unique_ptr<SpectralDominanceIndex> SpectralDominanceIndex::load(const std::
         in.bytes(magic, sizeof(magic));
         if (std::memcmp(magic, INDEX_AMSD_MAGIC, sizeof(magic)) == 0) {
             const std::uint32_t version = in.pod<std::uint32_t>();
-            if (version != AMSD_SECTION_VERSION) {
+            if (version != 1 && version != AMSD_SECTION_VERSION) {
                 throw std::runtime_error("unknown AMSD section version");
             }
             index->amsd_.present = true;
             index->amsd_.configured_ranks = in.pod<std::uint32_t>();
             index->amsd_.configured_bins = in.pod<std::uint32_t>();
+            if (version >= 2) {
+                index->amsd_.rank_select_mode = in.pod<std::uint32_t>();
+                index->amsd_.budget_ratio = in.pod<double>();
+                index->amsd_.budget_entries = in.pod<double>();
+                index->amsd_.space_entries = in.pod<std::uint64_t>();
+                const std::uint32_t num_selected = in.pod<std::uint32_t>();
+                index->amsd_.selected_ranks.resize(num_selected);
+                for (std::uint32_t& rank : index->amsd_.selected_ranks) {
+                    rank = in.pod<std::uint32_t>();
+                }
+                const std::uint32_t num_order = in.pod<std::uint32_t>();
+                index->amsd_.selection_order.resize(num_order);
+                for (std::uint32_t& rank : index->amsd_.selection_order) {
+                    rank = in.pod<std::uint32_t>();
+                }
+            }
             const std::uint32_t num_vertices_with_degrees = in.pod<std::uint32_t>();
             index->amsd_.degrees.resize(static_cast<std::size_t>(num_vertices_with_degrees));
             in.bytes(reinterpret_cast<char*>(index->amsd_.degrees.data()),
@@ -445,12 +564,77 @@ std::unique_ptr<SpectralDominanceIndex> SpectralDominanceIndex::load(const std::
                         static_cast<std::uint64_t>(words) * sizeof(std::uint64_t);
                 }
             }
+            if (version == 1) {
+                for (const AmsdGroup& group : index->amsd_.groups) {
+                    for (const AmsdRankIndex& rank : group.ranks) {
+                        index->amsd_.selected_ranks.push_back(rank.rank);
+                    }
+                }
+                std::sort(index->amsd_.selected_ranks.begin(),
+                          index->amsd_.selected_ranks.end());
+                index->amsd_.selected_ranks.erase(
+                    std::unique(index->amsd_.selected_ranks.begin(),
+                                index->amsd_.selected_ranks.end()),
+                    index->amsd_.selected_ranks.end());
+                index->amsd_.selection_order = index->amsd_.selected_ranks;
+                index->amsd_.rank_select_mode = 3;
+                std::uint64_t space = 0;
+                for (std::uint32_t rank : index->amsd_.selected_ranks) {
+                    std::uint64_t count = 0;
+                    for (const LocalSpectralSignature& signature : index->signatures_) {
+                        if (signature.dimension() >= rank) {
+                            ++count;
+                        }
+                    }
+                    space += count;
+                }
+                index->amsd_.space_entries = space;
+            }
         }
     } catch (const std::exception&) {
         index->amsd_ = AmsdIndex();
     }
 
     return index;
+}
+
+void SpectralDominanceIndex::rebuild_amsd(const SlimConfig& config) {
+    config.validate();
+    if (!has_amsd() || amsd_.degrees.size() != signatures_.size()) {
+        throw std::runtime_error(
+            "--rebuild-amsd needs a base index that carries the AMSD section (its degree array)");
+    }
+    const std::size_t num_vertices = signatures_.size();
+    const std::vector<std::uint32_t> degrees = amsd_.degrees;
+    std::uint32_t max_signature_dim = 0;
+    for (const LocalSpectralSignature& signature : signatures_) {
+        max_signature_dim =
+            std::max(max_signature_dim, static_cast<std::uint32_t>(signature.dimension()));
+    }
+    const RankSelectionOptions selection_options =
+        make_rank_selection_options(config, tau_, num_vertices, max_signature_dim);
+    const RankSelectionResult selection = select_rank_set(signatures_, selection_options);
+
+    std::vector<AmsdBuildGroup> groups;
+    groups.reserve(groups_.size());
+    for (const LabelGroup& group : groups_) {
+        groups.push_back({group.label, group.vertices.data(), group.vertices.size()});
+    }
+    amsd_ = build_amsd_index(groups, signatures_, degrees, selection.selected_ranks,
+                             static_cast<std::uint32_t>(config.amsd_bins));
+    amsd_.configured_ranks = selection.max_rank;
+    amsd_.rank_select_mode = static_cast<std::uint32_t>(config.amsd_rank_select);
+    amsd_.budget_ratio = config.amsd_budget_ratio;
+    amsd_.budget_entries = selection.budget_entries;
+    amsd_.space_entries = selection.space_entries;
+    amsd_.selection_order = selection.selection_order;
+    if (!config.rank_report_path.empty()) {
+        write_rank_report(config.rank_report_path, selection);
+    }
+    if (!config.rank_signals_dump_path.empty()) {
+        write_rank_signals_dump(config.rank_signals_dump_path, tau_, selection.max_rank,
+                                signatures_);
+    }
 }
 
 OfflineIndexBuilder::OfflineIndexBuilder(const LabeledGraph& graph, SlimConfig config)
@@ -653,6 +837,15 @@ std::unique_ptr<SpectralDominanceIndex> OfflineIndexBuilder::build() {
     const double tau = config_.tau_scale * lambda_max_global /
                        std::sqrt(static_cast<double>(num_vertices));
 
+    if (!config_.rank_signals_dump_path.empty()) {
+        std::uint32_t max_rank = 0;
+        for (const LocalSpectralSignature& signature : signatures) {
+            max_rank = std::max(max_rank, static_cast<std::uint32_t>(signature.dimension()));
+        }
+        max_rank = std::min(max_rank, static_cast<std::uint32_t>(std::max(0, config_.amsd_ranks)));
+        write_rank_signals_dump(config_.rank_signals_dump_path, tau, max_rank, signatures);
+    }
+
     auto kappa_of = [tau](const LocalSpectralSignature& signature)
         -> SpectralDominanceIndex::DominanceKey {
         return {static_cast<std::uint32_t>(std::floor(signature.lambda_max() / tau)),
@@ -722,19 +915,37 @@ std::unique_ptr<SpectralDominanceIndex> OfflineIndexBuilder::build() {
         std::chrono::milliseconds>(assemble_end - preprocess_end).count());
 
     const auto amsd_start = std::chrono::steady_clock::now();
-    if (config_.amsd_ranks > 0) {
-        std::vector<AmsdBuildGroup> amsd_groups;
-        amsd_groups.reserve(index->groups_.size());
-        for (const SpectralDominanceIndex::LabelGroup& group : index->groups_) {
-            amsd_groups.push_back({group.label, group.vertices.data(), group.vertices.size()});
-        }
-        std::vector<std::uint32_t> degrees(num_vertices, 0);
-        for (VertexId v = 0; v < num_vertices; ++v) {
-            degrees[v] = static_cast<std::uint32_t>(graph_.degree(v));
-        }
-        index->amsd_ = build_amsd_index(amsd_groups, index->signatures_, degrees,
-                                        static_cast<std::uint32_t>(config_.amsd_ranks),
-                                        static_cast<std::uint32_t>(config_.amsd_bins));
+    std::uint32_t max_signature_dim = 0;
+    for (const LocalSpectralSignature& signature : index->signatures_) {
+        max_signature_dim =
+            std::max(max_signature_dim, static_cast<std::uint32_t>(signature.dimension()));
+    }
+    const RankSelectionOptions selection_options =
+        make_rank_selection_options(config_, tau, num_vertices, max_signature_dim);
+    const RankSelectionResult selection =
+        select_rank_set(index->signatures_, selection_options);
+
+    std::vector<AmsdBuildGroup> amsd_groups;
+    amsd_groups.reserve(index->groups_.size());
+    for (const SpectralDominanceIndex::LabelGroup& group : index->groups_) {
+        amsd_groups.push_back({group.label, group.vertices.data(), group.vertices.size()});
+    }
+    std::vector<std::uint32_t> degrees(num_vertices, 0);
+    for (VertexId v = 0; v < num_vertices; ++v) {
+        degrees[v] = static_cast<std::uint32_t>(graph_.degree(v));
+    }
+    index->amsd_ = build_amsd_index(amsd_groups, index->signatures_, degrees,
+                                    selection.selected_ranks,
+                                    static_cast<std::uint32_t>(config_.amsd_bins));
+    index->amsd_.configured_ranks = selection.max_rank;
+    index->amsd_.rank_select_mode = static_cast<std::uint32_t>(config_.amsd_rank_select);
+    index->amsd_.budget_ratio = config_.amsd_budget_ratio;
+    index->amsd_.budget_entries = selection.budget_entries;
+    index->amsd_.space_entries = selection.space_entries;
+    index->amsd_.selection_order = selection.selection_order;
+
+    if (!config_.rank_report_path.empty()) {
+        write_rank_report(config_.rank_report_path, selection);
     }
     const auto amsd_end = std::chrono::steady_clock::now();
     timings_.amsd_ms = static_cast<std::uint64_t>(std::chrono::duration_cast<

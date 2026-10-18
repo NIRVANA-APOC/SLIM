@@ -65,7 +65,10 @@ public:
     std::uint64_t win_rejects() const { return win_rejects_; }
     std::uint64_t empty_accepts() const { return empty_accepts_; }
 
-    void set_amsd_adaptive(bool adaptive) { amsd_adaptive_ = adaptive; }
+    void set_amsd_adaptive(bool adaptive) {
+        amsd_adaptive_ = adaptive;
+        amsd_provider_adaptive_ = adaptive;
+    }
     bool amsd_adaptive() const { return amsd_adaptive_; }
 
     void set_stage_timings(bool enabled) { stage_timings_ = enabled; }
@@ -160,6 +163,7 @@ private:
     mutable std::uint64_t empty_accepts_ = 0;
 
     bool amsd_adaptive_ = true;
+    bool amsd_provider_adaptive_ = true;
     bool stage_timings_ = false;
     bool use_index_degrees_ = false;
 
